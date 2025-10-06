@@ -113,10 +113,16 @@ Run the test suite:
 ./test.sh
 ```
 
+Verify the exact commands from the problem statement work:
+```bash
+./verify-problem-statement.sh
+```
+
 ## Scripts
 
 - `start-cluster.sh` - Quick start script that builds and launches a complete cluster
 - `test.sh` - Runs basic validation tests on the Docker image
+- `verify-problem-statement.sh` - Verifies that the exact commands from requirements work correctly
 
 ## License
 MIT License

@@ -1,0 +1,36 @@
+version: '3.8'
+
+services:
+  cluster_relay:
+    build: .
+    image: cluster-suite:latest
+    container_name: cluster_relay
+    command: --mode relay --cluster myfleet --relay-port 4040
+    ports:
+      - "4040:4040"
+    networks:
+      - cluster_network
+
+  node1:
+    build: .
+    image: cluster-suite:latest
+    container_name: node1
+    command: --mode node --cluster myfleet --node node1 --relay-host cluster_relay --relay-port 4040 --lan-port 5001 --enable-ble
+    depends_on:
+      - cluster_relay
+    networks:
+      - cluster_network
+
+  node2:
+    build: .
+    image: cluster-suite:latest
+    container_name: node2
+    command: --mode node --cluster myfleet --node node2 --relay-host cluster_relay --relay-port 4040 --lan-port 5002
+    depends_on:
+      - cluster_relay
+    networks:
+      - cluster_network
+
+networks:
+  cluster_network:
+    driver: bridge

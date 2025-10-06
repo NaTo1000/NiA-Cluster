@@ -1,0 +1,15 @@
+# NiA-Cluster Python Dependencies
+# Add your project dependencies here
+
+# Core dependencies
+flask>=2.3.0
+paho-mqtt>=1.6.0
+requests>=2.31.0
+pyyaml>=6.0
+
+# ESP/IoT Communication
+pyserial>=3.5
+bleak>=0.21.0
+
+# Utilities
+python-dotenv>=1.0.0

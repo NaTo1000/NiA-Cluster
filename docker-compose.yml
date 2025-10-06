@@ -1,0 +1,42 @@
+version: '3.8'
+
+services:
+  manager:
+    build:
+      context: .
+      dockerfile: Dockerfile.manager
+    container_name: nia-cluster-manager
+    ports:
+      - "8080:8080"
+      - "1883:1883"
+    environment:
+      - CLUSTER_MODE=manager
+      - SECURITY_ENABLED=true
+    volumes:
+      - ./data:/data
+      - ./config:/config
+    networks:
+      - nia-network
+    restart: unless-stopped
+
+  esp-controller:
+    build:
+      context: .
+      dockerfile: Dockerfile.esp-controller
+    container_name: nia-cluster-esp-controller
+    ports:
+      - "9000:9000"
+    environment:
+      - ESP_PROTOCOL=wifi-ble
+      - PORT_CONTROL=enabled
+    privileged: true
+    networks:
+      - nia-network
+    restart: unless-stopped
+
+networks:
+  nia-network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.20.0.0/16

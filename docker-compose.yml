@@ -1,0 +1,28 @@
+version: "3.8"
+services:
+  relay:
+    build: .
+    container_name: cluster_relay
+    command: ["--mode", "relay-server", "--host", "0.0.0.0", "--port", "4040"]
+    ports:
+      - "4040:4040"
+    restart: unless-stopped
+
+  node1:
+    build: .
+    container_name: cluster_node1
+    depends_on:
+      - relay
+    environment:
+      - PYTHONUNBUFFERED=1
+    command: ["--mode", "node", "--cluster", "myfleet", "--node", "node1", "--relay-host", "relay", "--relay-port", "4040", "--lan-port", "5001", "--enable-ble"]
+    network_mode: "bridge"
+    restart: unless-stopped
+
+  node2:
+    build: .
+    container_name: cluster_node2
+    depends_on:
+      - relay
+    command: ["--mode", "node", "--cluster", "myfleet", "--node", "node2", "--relay-host", "relay", "--relay-port", "4040", "--lan-port", "5002"]
+    restart: unless-stopped

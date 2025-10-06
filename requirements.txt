@@ -1,0 +1,33 @@
+# Core networking libraries
+asyncio-mqtt>=0.16.1
+paramiko>=3.4.0
+ftplib3>=1.0.1
+pyserial>=3.5
+bleak>=0.21.1
+
+# ESP-32 integration
+esptool>=4.7.0
+micropython-esp32>=1.22.0
+
+# Network management
+netifaces>=0.11.0
+scapy>=2.5.0
+python-nmap>=0.7.1
+
+# AI and voice control
+SpeechRecognition>=3.10.0
+pyttsx3>=2.90
+openai>=1.0.0
+
+# Communication interfaces
+smtplib2>=0.1.0
+twilio>=8.10.0
+
+# Cross-platform support
+psutil>=5.9.0
+platform-utils>=1.0.0
+
+# Configuration and utilities
+pyyaml>=6.0
+cryptography>=41.0.0
+python-dotenv>=1.0.0

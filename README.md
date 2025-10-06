@@ -13,16 +13,23 @@ NiA-Cluster is a distributed clustering system that allows multiple nodes to com
 
 ## Quick Start
 
-### Using Docker Compose (Recommended)
+### Option 1: Using the Startup Script (Easiest)
 ```bash
-# Build and start the entire cluster
-docker-compose up --build
-
-# Stop the cluster
-docker-compose down
+./start-cluster.sh
 ```
 
-### Using Docker Run Commands
+This will automatically build the image and start the relay + 2 nodes.
+
+### Option 2: Using Docker Compose (Recommended for Development)
+```bash
+# Build and start the entire cluster
+docker compose up --build
+
+# Stop the cluster
+docker compose down
+```
+
+### Option 3: Using Docker Run Commands (Manual)
 
 #### 1. Start the Relay Server
 ```bash
@@ -98,6 +105,18 @@ python3 cluster_manager.py --mode node --cluster myfleet --node node1 \
 ```bash
 docker build -t cluster-suite:latest .
 ```
+
+## Testing
+
+Run the test suite:
+```bash
+./test.sh
+```
+
+## Scripts
+
+- `start-cluster.sh` - Quick start script that builds and launches a complete cluster
+- `test.sh` - Runs basic validation tests on the Docker image
 
 ## License
 MIT License

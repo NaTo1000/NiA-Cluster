@@ -1,0 +1,35 @@
+{
+  "cluster_name": "nia-cluster",
+  "network": {
+    "name": "nia-network",
+    "driver": "bridge",
+    "subnet": "172.20.0.0/16"
+  },
+  "services": {
+    "manager": {
+      "image": "nia-cluster-manager",
+      "ports": [
+        "8080:8080",
+        "1883:1883"
+      ],
+      "environment": {
+        "CLUSTER_MODE": "manager",
+        "SECURITY_ENABLED": "true"
+      },
+      "volumes": [
+        "./data:/data",
+        "./config:/config"
+      ]
+    },
+    "esp-controller": {
+      "image": "nia-esp-controller",
+      "ports": [
+        "9000:9000"
+      ],
+      "environment": {
+        "ESP_PROTOCOL": "wifi-ble",
+        "PORT_CONTROL": "enabled"
+      }
+    }
+  }
+}

@@ -1,0 +1,120 @@
+# NiA-Cluster Configuration Example
+
+cluster:
+  # Cluster operation mode: standalone, share, master, node
+  mode: standalone
+  
+  # Automatically reconnect on connection loss
+  auto_reconnect: true
+  
+  # Reconnection timeout in seconds
+  reconnect_timeout: 30
+  
+  # Cluster identifier (for multi-cluster setups)
+  cluster_id: "nia-cluster-1"
+
+wifi:
+  # Automatically connect to preferred networks
+  auto_connect: false
+  
+  # List of preferred WiFi networks (in priority order)
+  preferred_networks:
+    - ssid: "MyNetwork"
+      password: "password123"
+    - ssid: "BackupNetwork"
+      password: "backup456"
+
+bluetooth:
+  # Bluetooth scan timeout in seconds
+  scan_timeout: 10
+  
+  # Automatically reconnect to known devices
+  auto_reconnect: true
+  
+  # Device whitelist (only connect to these devices)
+  whitelist: []
+
+esp32:
+  # Default baud rate for ESP-32 communication
+  default_baudrate: 115200
+  
+  # Automatically detect ESP-32 devices
+  auto_detect: true
+  
+  # Known ESP-32 devices
+  devices: []
+
+ssh:
+  # SSH key directory
+  key_directory: "~/.ssh"
+  
+  # Default SSH port
+  default_port: 22
+  
+  # Default username
+  default_user: "admin"
+  
+  # Known hosts
+  hosts: []
+
+vlan:
+  # Default VLAN configurations
+  vlans: []
+
+portman:
+  # Port monitoring interval in seconds
+  monitoring_interval: 5
+  
+  # Anomaly detection threshold (0.0 - 1.0)
+  anomaly_threshold: 0.8
+  
+  # Ports to monitor (empty = all)
+  monitored_ports: []
+  
+  # Enable automatic alerts
+  alerts_enabled: true
+
+jessica:
+  # Enable voice control
+  voice_enabled: false
+  
+  # Enable continuous security monitoring
+  security_monitoring: true
+  
+  # Send notifications for threats
+  threat_notification: true
+  
+  # Threat level thresholds
+  thresholds:
+    low: 3
+    medium: 7
+    high: 12
+  
+  # Communication settings
+  email:
+    enabled: false
+    smtp_server: "smtp.gmail.com"
+    smtp_port: 587
+    sender: ""
+    recipients: []
+  
+  sms:
+    enabled: false
+    provider: "twilio"
+    account_sid: ""
+    auth_token: ""
+    from_number: ""
+    to_numbers: []
+  
+  phone:
+    enabled: false
+
+logging:
+  # Logging level: DEBUG, INFO, WARNING, ERROR, CRITICAL
+  level: INFO
+  
+  # Log file path (null for console only)
+  file: null
+  
+  # Log format
+  format: "%(asctime)s - %(name)s - %(levelname)s - %(message)s"

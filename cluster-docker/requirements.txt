@@ -1,0 +1,14 @@
+# Python dependencies for NiA-Cluster GUI Suite
+# Core dependencies
+# Note: tkinter is included with Python standard library
+
+# Networking and protocol support
+requests==2.31.0
+pyyaml==6.0.1
+
+# Security
+cryptography==41.0.7
+pycryptodome==3.19.0
+
+# Logging and utilities
+python-dateutil==2.8.2

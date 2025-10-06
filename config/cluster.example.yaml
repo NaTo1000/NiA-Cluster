@@ -1,0 +1,73 @@
+# NiA-Cluster Configuration Example
+
+# Cluster settings
+cluster:
+  name: "NiA-Cluster"
+  auto_reconnect: true
+  reconnect_timeout: 30
+
+# Network configuration
+network:
+  wifi:
+    enabled: true
+    ssid: "YourSSID"
+    password: "YourPassword"  # Use secure storage in production
+    interface: "wlan0"
+  
+  bluetooth:
+    enabled: true
+    discoverable: false
+    device_name: "NiA-Cluster"
+  
+  ssh:
+    enabled: true
+    port: 22
+    key_based_auth: true
+    allowed_users: []
+  
+  telnet:
+    enabled: false
+    port: 23
+  
+  ftp:
+    enabled: false
+    port: 21
+
+# ESP32 configuration
+esp32:
+  enabled: true
+  baudrate: 115200
+  port: "/dev/ttyUSB0"  # Windows: "COM3", macOS: "/dev/tty.usbserial"
+
+# VLAN configuration
+vlan:
+  enabled: false
+  interfaces:
+    - id: 100
+      name: "management"
+      interface: "eth0"
+    - id: 200
+      name: "data"
+      interface: "eth1"
+
+# AI services configuration
+ai:
+  portman:
+    enabled: true
+    monitoring_interval: 5  # seconds
+    alert_threshold: 80  # percentage
+  
+  jessica:
+    enabled: true
+    voice_control: false  # Requires microphone and speaker
+    wake_word: "jessica"
+    notifications:
+      email: false
+      sms: false
+      # Configure SMTP and SMS settings separately
+
+# Security configuration
+security:
+  encryption: true
+  key_storage: "~/.nia-cluster/keys"
+  # SSH keys will be automatically generated if not present

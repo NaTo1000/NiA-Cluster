@@ -1,0 +1,42 @@
+ai:
+  jessica:
+    enabled: true
+    notifications:
+      email: false
+      sms: false
+    voice_control: false
+  portman:
+    enabled: true
+    monitoring_interval: 5
+cluster:
+  auto_reconnect: true
+  name: NiA-Cluster
+  reconnect_timeout: 30
+esp32:
+  baudrate: 115200
+  enabled: true
+  port: /dev/ttyUSB0
+network:
+  bluetooth:
+    discoverable: false
+    enabled: true
+  ftp:
+    enabled: false
+    port: 21
+  ssh:
+    enabled: true
+    key_based_auth: true
+    port: 22
+  telnet:
+    enabled: false
+    port: 23
+  wifi:
+    enabled: true
+    interface: wlan0
+    ssid: ''
+security:
+  encryption: true
+  key_storage: ~/.nia-cluster/keys
+vlan:
+  enabled: false
+  interfaces: []

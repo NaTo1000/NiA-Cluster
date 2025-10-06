@@ -64,3 +64,6 @@ Thumbs.db
 *.tmp
 *.bak
 .cache/
+
+# Development scripts
+test_structure.py

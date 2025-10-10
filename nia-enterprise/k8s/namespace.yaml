@@ -1,0 +1,7 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: nia-enterprise
+  labels:
+    app: nia-enterprise
+    environment: production

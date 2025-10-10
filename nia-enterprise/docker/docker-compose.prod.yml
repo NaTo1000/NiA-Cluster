@@ -1,0 +1,190 @@
+version: '3.8'
+
+services:
+  # High-availability relay cluster
+  relay-primary:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.prod
+    image: nia-enterprise:latest
+    container_name: nia-relay-primary
+    command: >
+      --mode relay
+      --cluster production
+      --relay-port 4040
+      --ha-enabled
+      --peer-relays relay-secondary:4040
+    ports:
+      - "4040:4040"
+      - "8080:8080"
+      - "9090:9090"
+    volumes:
+      - ./config:/config:ro
+      - ./certs:/certs:ro
+    environment:
+      - RELAY_MODE=production
+      - ENABLE_TLS=false
+      - METRICS_ENABLED=true
+    networks:
+      - nia-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  relay-secondary:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.prod
+    image: nia-enterprise:latest
+    container_name: nia-relay-secondary
+    command: >
+      --mode relay
+      --cluster production
+      --relay-port 4040
+      --ha-enabled
+      --peer-relays relay-primary:4040
+    ports:
+      - "4041:4040"
+      - "8081:8080"
+      - "9091:9090"
+    volumes:
+      - ./config:/config:ro
+      - ./certs:/certs:ro
+    environment:
+      - RELAY_MODE=production
+      - ENABLE_TLS=false
+      - METRICS_ENABLED=true
+    networks:
+      - nia-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # Example production nodes
+  node1:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.prod
+    image: nia-enterprise:latest
+    container_name: nia-node-1
+    command: >
+      --mode node
+      --cluster production
+      --node node-1
+      --relay-host relay-primary
+      --relay-port 4040
+      --lan-port 5001
+      --enable-ble
+    depends_on:
+      - relay-primary
+    networks:
+      - nia-network
+    restart: unless-stopped
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  node2:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.prod
+    image: nia-enterprise:latest
+    container_name: nia-node-2
+    command: >
+      --mode node
+      --cluster production
+      --node node-2
+      --relay-host relay-secondary
+      --relay-port 4040
+      --lan-port 5002
+    depends_on:
+      - relay-secondary
+    networks:
+      - nia-network
+    restart: unless-stopped
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # Prometheus for metrics collection
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: nia-prometheus
+    ports:
+      - "9092:9090"
+    volumes:
+      - ./config/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus-data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/usr/share/prometheus/console_libraries'
+      - '--web.console.templates=/usr/share/prometheus/consoles'
+    networks:
+      - nia-network
+    restart: unless-stopped
+
+  # Grafana for monitoring dashboards
+  grafana:
+    image: grafana/grafana:latest
+    container_name: nia-grafana
+    ports:
+      - "3000:3000"
+    volumes:
+      - grafana-data:/var/lib/grafana
+      - ./config/grafana:/etc/grafana/provisioning:ro
+    environment:
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+      - GF_INSTALL_PLUGINS=
+    depends_on:
+      - prometheus
+    networks:
+      - nia-network
+    restart: unless-stopped
+
+  # HAProxy for load balancing
+  haproxy:
+    image: haproxy:2.8-alpine
+    container_name: nia-haproxy
+    ports:
+      - "4000:4000"
+      - "8404:8404"  # Stats page
+    volumes:
+      - ./config/haproxy.cfg:/usr/local/etc/haproxy/haproxy.cfg:ro
+    depends_on:
+      - relay-primary
+      - relay-secondary
+    networks:
+      - nia-network
+    restart: unless-stopped
+
+networks:
+  nia-network:
+    driver: bridge
+
+volumes:
+  prometheus-data:
+  grafana-data:

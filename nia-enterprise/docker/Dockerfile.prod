@@ -1,0 +1,53 @@
+FROM python:3.11-slim as builder
+
+WORKDIR /build
+
+# Install build dependencies
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    gcc \
+    && rm -rf /var/lib/apt/lists/*
+
+# Copy requirements
+COPY requirements.txt requirements-prod.txt ./
+RUN pip install --user --no-cache-dir -r requirements-prod.txt
+
+# Production stage
+FROM python:3.11-slim
+
+LABEL maintainer="enterprise@nia-cluster.io"
+LABEL version="1.0.0"
+LABEL description="NiA-Enterprise Cluster Manager - Production Image"
+
+# Create non-root user
+RUN useradd -m -u 1000 -s /bin/bash nia && \
+    mkdir -p /app /certs /config && \
+    chown -R nia:nia /app /certs /config
+
+WORKDIR /app
+
+# Copy Python packages from builder
+COPY --from=builder /root/.local /home/nia/.local
+
+# Copy application code
+COPY --chown=nia:nia cluster_manager_enterprise.py ./
+
+# Set environment variables
+ENV PATH=/home/nia/.local/bin:$PATH \
+    PYTHONUNBUFFERED=1 \
+    PYTHONDONTWRITEBYTECODE=1
+
+# Switch to non-root user
+USER nia
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
+    CMD python -c "import urllib.request; urllib.request.urlopen('http://localhost:8080/health')" || exit 1
+
+# Expose ports
+EXPOSE 4040 8080 9090
+
+# Set the entrypoint
+ENTRYPOINT ["python3", "cluster_manager_enterprise.py"]
+
+# Default command
+CMD ["--help"]

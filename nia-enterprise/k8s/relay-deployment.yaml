@@ -1,0 +1,135 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nia-relay
+  namespace: nia-enterprise
+  labels:
+    app: nia-relay
+    component: relay
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: nia-relay
+      component: relay
+  template:
+    metadata:
+      labels:
+        app: nia-relay
+        component: relay
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "9090"
+        prometheus.io/path: "/metrics"
+    spec:
+      containers:
+      - name: relay
+        image: nia-enterprise:latest
+        imagePullPolicy: IfNotPresent
+        args:
+          - --mode
+          - relay
+          - --cluster
+          - production
+          - --relay-port
+          - "4040"
+          - --ha-enabled
+        ports:
+        - name: relay
+          containerPort: 4040
+          protocol: TCP
+        - name: health
+          containerPort: 8080
+          protocol: TCP
+        - name: metrics
+          containerPort: 9090
+          protocol: TCP
+        env:
+        - name: RELAY_MODE
+          value: "production"
+        - name: ENABLE_TLS
+          value: "false"
+        - name: METRICS_ENABLED
+          value: "true"
+        volumeMounts:
+        - name: config
+          mountPath: /config
+          readOnly: true
+        - name: secrets
+          mountPath: /secrets
+          readOnly: true
+        resources:
+          requests:
+            memory: "128Mi"
+            cpu: "100m"
+          limits:
+            memory: "512Mi"
+            cpu: "500m"
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8080
+          initialDelaySeconds: 10
+          periodSeconds: 30
+          timeoutSeconds: 5
+          failureThreshold: 3
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: 8080
+          initialDelaySeconds: 5
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+        securityContext:
+          runAsNonRoot: true
+          runAsUser: 1000
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+            - ALL
+      volumes:
+      - name: config
+        configMap:
+          name: nia-config
+      - name: secrets
+        secret:
+          secretName: nia-secrets
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 100
+            podAffinityTerm:
+              labelSelector:
+                matchExpressions:
+                - key: app
+                  operator: In
+                  values:
+                  - nia-relay
+              topologyKey: kubernetes.io/hostname
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: nia-relay-hpa
+  namespace: nia-enterprise
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: nia-relay
+  minReplicas: 2
+  maxReplicas: 10
+  metrics:
+  - type: Resource
+    resource:
+      name: cpu
+      target:
+        type: Utilization
+        averageUtilization: 70
+  - type: Resource
+    resource:
+      name: memory
+      target:
+        type: Utilization
+        averageUtilization: 80

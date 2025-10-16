@@ -74,6 +74,24 @@ kubectl apply -f k8s/ingress.yaml
 kubectl get pods -n nia-enterprise
 ```
 
+### Option 2b: Google Cloud Build (Kubernetes Deployment)
+```bash
+# Build and deploy to GKE with Cloud Build
+cd ..
+./submit-cloud-build.sh enterprise YOUR_PROJECT_ID
+
+# Or use Makefile
+make cloud-deploy-enterprise PROJECT_ID=YOUR_PROJECT_ID GKE_CLUSTER=nia-cluster
+
+# Or direct gcloud command with deployment enabled
+gcloud builds submit \
+  --config=cloudbuild.yaml \
+  --substitutions=_ENABLE_DEPLOYMENT=true,_GKE_CLUSTER=nia-cluster,_GKE_REGION=us-central1 \
+  ./nia-enterprise
+```
+
+See [../CLOUD_BUILD.md](../CLOUD_BUILD.md) for complete Cloud Build documentation.
+
 ### Option 3: Helm Chart
 ```bash
 helm repo add nia-enterprise https://charts.nia-enterprise.io

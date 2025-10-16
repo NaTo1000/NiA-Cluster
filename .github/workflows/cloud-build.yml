@@ -1,0 +1,176 @@
+name: Cloud Build Integration
+
+on:
+  push:
+    branches: [ main, develop ]
+    tags: [ 'v*' ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+    inputs:
+      build_target:
+        description: 'Build target (root, enterprise, or both)'
+        required: true
+        default: 'both'
+        type: choice
+        options:
+          - root
+          - enterprise
+          - both
+      deploy_to_gke:
+        description: 'Deploy to GKE (enterprise only)'
+        required: false
+        type: boolean
+        default: false
+
+env:
+  GCP_PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }}
+  GKE_CLUSTER: nia-cluster
+  GKE_REGION: us-central1
+
+jobs:
+  cloud-build-root:
+    name: Cloud Build - Cluster Suite
+    runs-on: ubuntu-latest
+    if: |
+      github.event_name == 'push' || 
+      github.event_name == 'pull_request' ||
+      (github.event_name == 'workflow_dispatch' && (github.event.inputs.build_target == 'root' || github.event.inputs.build_target == 'both'))
+    
+    permissions:
+      contents: read
+      id-token: write  # For Workload Identity
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GCP_SA_KEY }}
+          # Alternative: use Workload Identity Federation
+          # workload_identity_provider: ${{ secrets.WIF_PROVIDER }}
+          # service_account: ${{ secrets.WIF_SERVICE_ACCOUNT }}
+      
+      - name: Set up Cloud SDK
+        uses: google-github-actions/setup-gcloud@v2
+        with:
+          project_id: ${{ env.GCP_PROJECT_ID }}
+      
+      - name: Submit to Cloud Build
+        run: |
+          gcloud builds submit \
+            --config=cloudbuild.yaml \
+            --substitutions=_CLUSTER_NAME=myfleet,_RELAY_PORT=4040 \
+            --project=${{ env.GCP_PROJECT_ID }} \
+            .
+      
+      - name: Comment PR with build status
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: '✅ Cloud Build completed for cluster-suite!'
+            })
+
+  cloud-build-enterprise:
+    name: Cloud Build - NiA Enterprise
+    runs-on: ubuntu-latest
+    if: |
+      github.event_name == 'push' || 
+      github.event_name == 'pull_request' ||
+      (github.event_name == 'workflow_dispatch' && (github.event.inputs.build_target == 'enterprise' || github.event.inputs.build_target == 'both'))
+    
+    permissions:
+      contents: read
+      id-token: write
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GCP_SA_KEY }}
+      
+      - name: Set up Cloud SDK
+        uses: google-github-actions/setup-gcloud@v2
+        with:
+          project_id: ${{ env.GCP_PROJECT_ID }}
+      
+      - name: Determine deployment flag
+        id: deploy
+        run: |
+          DEPLOY="false"
+          if [[ "${{ github.ref }}" == refs/tags/v* ]]; then
+            DEPLOY="true"
+          fi
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]] && [[ "${{ github.event.inputs.deploy_to_gke }}" == "true" ]]; then
+            DEPLOY="true"
+          fi
+          echo "deploy=$DEPLOY" >> $GITHUB_OUTPUT
+      
+      - name: Submit to Cloud Build
+        run: |
+          gcloud builds submit \
+            --config=cloudbuild.yaml \
+            --substitutions="_CLUSTER_NAME=production,_ENABLE_DEPLOYMENT=${{ steps.deploy.outputs.deploy }},_GKE_CLUSTER=${{ env.GKE_CLUSTER }},_GKE_REGION=${{ env.GKE_REGION }},_ARTIFACT_BUCKET=${{ env.GCP_PROJECT_ID }}-build-artifacts" \
+            --project=${{ env.GCP_PROJECT_ID }} \
+            ./nia-enterprise
+      
+      - name: Comment PR with build status
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const deployed = '${{ steps.deploy.outputs.deploy }}' === 'true' ? '(deployed to GKE)' : '';
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: `✅ Cloud Build completed for nia-enterprise! ${deployed}`
+            })
+      
+      - name: Create deployment status
+        if: steps.deploy.outputs.deploy == 'true'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            github.rest.repos.createDeploymentStatus({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              deployment_id: context.payload.deployment.id,
+              state: 'success',
+              environment: github.ref.startsWith('refs/tags/') ? 'production' : 'staging',
+              description: 'Deployed to GKE via Cloud Build'
+            })
+
+  validate-configs:
+    name: Validate Cloud Build Configs
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+      
+      - name: Install PyYAML
+        run: pip install pyyaml
+      
+      - name: Validate YAML files
+        run: |
+          echo "Validating cloudbuild.yaml files..."
+          python3 -c "import yaml; yaml.safe_load(open('cloudbuild.yaml'))" && echo "✓ Root cloudbuild.yaml is valid"
+          python3 -c "import yaml; yaml.safe_load(open('nia-enterprise/cloudbuild.yaml'))" && echo "✓ Enterprise cloudbuild.yaml is valid"
+          python3 -c "import yaml; yaml.safe_load(open('nia-enterprise/docker/container-structure-test.yaml'))" && echo "✓ Container structure test is valid"
+          echo "All YAML configurations are valid!"

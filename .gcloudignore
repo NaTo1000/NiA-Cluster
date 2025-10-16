@@ -1,0 +1,58 @@
+# This file specifies files that are *not* uploaded to Google Cloud Build
+# using gcloud. It follows the same syntax as .gitignore
+
+.gcloudignore
+.git
+.gitignore
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+.venv/
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Documentation (keep markdown for build metadata)
+# *.md
+
+# Logs
+*.log
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+
+# Node modules (if any)
+node_modules/
+
+# Build artifacts (don't upload pre-built artifacts)
+dist/
+build/
+*.egg-info/
+
+# Docker
+.dockerignore
+
+# Test outputs
+test-results/
+*.xml

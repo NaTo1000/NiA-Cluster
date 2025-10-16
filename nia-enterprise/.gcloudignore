@@ -1,0 +1,55 @@
+# This file specifies files that are *not* uploaded to Google Cloud Build
+# for the nia-enterprise project
+
+.gcloudignore
+.git
+.gitignore
+../.git
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+.venv/
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+tests/__pycache__/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+
+# Build artifacts
+dist/
+build/
+*.egg-info/
+
+# Test outputs
+test-results/
+*.xml
+
+# Documentation - keep for metadata
+# *.md
+# docs/

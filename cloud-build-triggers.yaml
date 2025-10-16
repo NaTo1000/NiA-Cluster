@@ -1,0 +1,109 @@
+# Example Cloud Build Trigger Configuration
+# This file can be used to create build triggers via gcloud or Cloud Console
+
+# Trigger 1: Build cluster-suite on main branch
+---
+name: cluster-suite-main-build
+description: Build cluster-suite Docker image when main branch is updated
+filename: cloudbuild.yaml
+github:
+  owner: NaTo1000
+  name: NiA-Cluster
+  push:
+    branch: ^main$
+substitutions:
+  _CLUSTER_NAME: myfleet
+  _RELAY_PORT: "4040"
+tags:
+  - cluster-suite
+  - main-branch
+
+---
+# Trigger 2: Build cluster-suite on pull requests
+name: cluster-suite-pr-build
+description: Build and test cluster-suite on pull requests
+filename: cloudbuild.yaml
+github:
+  owner: NaTo1000
+  name: NiA-Cluster
+  pullRequest:
+    branch: ^main$
+    commentControl: COMMENTS_ENABLED
+substitutions:
+  _CLUSTER_NAME: myfleet
+  _RELAY_PORT: "4040"
+tags:
+  - cluster-suite
+  - pull-request
+
+---
+# Trigger 3: Build nia-enterprise on main branch
+name: nia-enterprise-main-build
+description: Build nia-enterprise when main branch or enterprise code is updated
+filename: nia-enterprise/cloudbuild.yaml
+github:
+  owner: NaTo1000
+  name: NiA-Cluster
+  push:
+    branch: ^main$
+includedFiles:
+  - nia-enterprise/**
+substitutions:
+  _CLUSTER_NAME: production
+  _ENABLE_DEPLOYMENT: "false"
+  _GKE_CLUSTER: nia-cluster
+  _GKE_REGION: us-central1
+tags:
+  - nia-enterprise
+  - main-branch
+
+---
+# Trigger 4: Build and deploy nia-enterprise on release tags
+name: nia-enterprise-release-deploy
+description: Build and deploy nia-enterprise on release tags
+filename: nia-enterprise/cloudbuild.yaml
+github:
+  owner: NaTo1000
+  name: NiA-Cluster
+  push:
+    tag: ^v[0-9]+\.[0-9]+\.[0-9]+$
+substitutions:
+  _CLUSTER_NAME: production
+  _ENABLE_DEPLOYMENT: "true"
+  _GKE_CLUSTER: nia-cluster-prod
+  _GKE_REGION: us-central1
+  _ARTIFACT_BUCKET: ${PROJECT_ID}-build-artifacts
+tags:
+  - nia-enterprise
+  - release
+  - production-deploy
+
+---
+# Trigger 5: Build nia-enterprise on PR
+name: nia-enterprise-pr-build
+description: Build and test nia-enterprise on pull requests
+filename: nia-enterprise/cloudbuild.yaml
+github:
+  owner: NaTo1000
+  name: NiA-Cluster
+  pullRequest:
+    branch: ^main$
+    commentControl: COMMENTS_ENABLED
+includedFiles:
+  - nia-enterprise/**
+substitutions:
+  _CLUSTER_NAME: test
+  _ENABLE_DEPLOYMENT: "false"
+tags:
+  - nia-enterprise
+  - pull-request
+
+---
+# To create these triggers, use:
+# 
+# gcloud builds triggers create github \
+#   --trigger-config=cloud-build-triggers.yaml \
+#   --project=YOUR_PROJECT_ID
+#
+# Or create them individually via the console or gcloud commands
+# See CLOUD_BUILD.md for detailed instructions

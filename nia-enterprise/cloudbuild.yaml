@@ -1,0 +1,182 @@
+# Google Cloud Build configuration for NiA-Enterprise
+# Production-grade cloud builder with multi-stage builds and optimizations
+
+steps:
+  # Step 1: Build the production Docker image
+  - name: 'gcr.io/cloud-builders/docker'
+    id: 'build-enterprise'
+    args:
+      - 'build'
+      - '-t'
+      - 'gcr.io/$PROJECT_ID/nia-enterprise:$COMMIT_SHA'
+      - '-t'
+      - 'gcr.io/$PROJECT_ID/nia-enterprise:latest'
+      - '-f'
+      - 'docker/Dockerfile.prod'
+      - '.'
+    dir: 'nia-enterprise'
+    timeout: 900s
+
+  # Step 2: Security scanning with Trivy
+  - name: 'aquasec/trivy'
+    id: 'security-scan'
+    args:
+      - 'image'
+      - '--exit-code'
+      - '0'
+      - '--severity'
+      - 'HIGH,CRITICAL'
+      - '--format'
+      - 'json'
+      - '--output'
+      - '/workspace/trivy-report.json'
+      - 'gcr.io/$PROJECT_ID/nia-enterprise:$COMMIT_SHA'
+    waitFor: ['build-enterprise']
+    timeout: 300s
+
+  # Step 3: Run container structure tests
+  - name: 'gcr.io/gcp-runtimes/container-structure-test'
+    id: 'structure-test'
+    args:
+      - 'test'
+      - '--image'
+      - 'gcr.io/$PROJECT_ID/nia-enterprise:$COMMIT_SHA'
+      - '--config'
+      - '/workspace/nia-enterprise/docker/container-structure-test.yaml'
+    waitFor: ['build-enterprise']
+    timeout: 180s
+    # Allow failure if test config doesn't exist yet
+    allowFailure: true
+
+  # Step 4: Test the built image help command
+  - name: 'gcr.io/$PROJECT_ID/nia-enterprise:$COMMIT_SHA'
+    id: 'test-help'
+    args: ['--help']
+    waitFor: ['build-enterprise']
+    timeout: 30s
+
+  # Step 5: Push the SHA-tagged image
+  - name: 'gcr.io/cloud-builders/docker'
+    id: 'push-sha'
+    args:
+      - 'push'
+      - 'gcr.io/$PROJECT_ID/nia-enterprise:$COMMIT_SHA'
+    waitFor: ['security-scan', 'test-help']
+    timeout: 300s
+
+  # Step 6: Push the latest tag
+  - name: 'gcr.io/cloud-builders/docker'
+    id: 'push-latest'
+    args:
+      - 'push'
+      - 'gcr.io/$PROJECT_ID/nia-enterprise:latest'
+    waitFor: ['security-scan', 'test-help']
+    timeout: 300s
+
+  # Step 7: Build multi-architecture images (optional, for production)
+  - name: 'gcr.io/cloud-builders/docker'
+    id: 'buildx-setup'
+    entrypoint: 'bash'
+    args:
+      - '-c'
+      - |
+        docker buildx create --name multiarch --use || true
+        docker buildx inspect --bootstrap
+    waitFor: ['-']
+    timeout: 120s
+
+  # Step 8: Build and push multi-arch image
+  - name: 'gcr.io/cloud-builders/docker'
+    id: 'build-multiarch'
+    entrypoint: 'bash'
+    args:
+      - '-c'
+      - |
+        docker buildx build \
+          --platform linux/amd64,linux/arm64 \
+          -t gcr.io/$PROJECT_ID/nia-enterprise:$COMMIT_SHA-multiarch \
+          -t gcr.io/$PROJECT_ID/nia-enterprise:latest-multiarch \
+          -f docker/Dockerfile.prod \
+          --push \
+          .
+    dir: 'nia-enterprise'
+    waitFor: ['buildx-setup', 'security-scan']
+    timeout: 1200s
+    # Allow failure for environments without buildx support
+    allowFailure: true
+
+  # Step 9: Deploy to GKE (if enabled)
+  - name: 'gcr.io/cloud-builders/kubectl'
+    id: 'deploy-gke'
+    entrypoint: 'bash'
+    args:
+      - '-c'
+      - |
+        if [ "$_ENABLE_DEPLOYMENT" = "true" ]; then
+          kubectl apply -f k8s/namespace.yaml
+          kubectl apply -f k8s/configmap.yaml
+          kubectl apply -f k8s/secrets.yaml
+          kubectl apply -f k8s/relay-deployment.yaml
+          kubectl apply -f k8s/node-deployment.yaml
+          kubectl apply -f k8s/services.yaml
+          kubectl apply -f k8s/ingress.yaml
+          kubectl rollout status deployment/nia-relay -n nia-enterprise --timeout=5m
+          kubectl rollout status deployment/nia-node -n nia-enterprise --timeout=5m
+        else
+          echo "Deployment skipped (set _ENABLE_DEPLOYMENT=true to enable)"
+        fi
+    dir: 'nia-enterprise'
+    env:
+      - 'CLOUDSDK_COMPUTE_REGION=${_GKE_REGION}'
+      - 'CLOUDSDK_CONTAINER_CLUSTER=${_GKE_CLUSTER}'
+    waitFor: ['push-sha', 'push-latest']
+    timeout: 600s
+    # Allow failure if deployment is not configured
+    allowFailure: true
+
+# Images to be pushed to Container Registry
+images:
+  - 'gcr.io/$PROJECT_ID/nia-enterprise:$COMMIT_SHA'
+  - 'gcr.io/$PROJECT_ID/nia-enterprise:latest'
+
+# Artifacts to save (test results, security reports)
+artifacts:
+  objects:
+    location: 'gs://${_ARTIFACT_BUCKET}/builds/$BUILD_ID'
+    paths:
+      - '/workspace/trivy-report.json'
+
+# Build options
+options:
+  # Use high-performance machine for faster builds
+  machineType: 'E2_HIGHCPU_8'
+  # Enable Docker layer caching
+  substitution_option: 'ALLOW_LOOSE'
+  # Use Cloud Logging
+  logging: CLOUD_LOGGING_ONLY
+  # Enable dynamic substitutions
+  dynamic_substitutions: true
+  # Set disk size for large builds
+  diskSizeGb: 100
+  # Worker pool for faster builds (if configured)
+  # pool:
+  #   name: 'projects/$PROJECT_ID/locations/${_REGION}/workerPools/${_WORKER_POOL}'
+
+# Timeout for the entire build (20 minutes)
+timeout: 1200s
+
+# Substitutions for customization
+substitutions:
+  _CLUSTER_NAME: 'production'
+  _RELAY_PORT: '4040'
+  _ENABLE_DEPLOYMENT: 'false'
+  _GKE_REGION: 'us-central1'
+  _GKE_CLUSTER: 'nia-cluster'
+  _ARTIFACT_BUCKET: '${PROJECT_ID}-build-artifacts'
+
+# Tags for organizing builds
+tags:
+  - 'nia-enterprise'
+  - 'production'
+  - 'cloud-build'
+  - 'kubernetes'

@@ -1,4 +1,5 @@
 """Configuration management for NiA-Cluster."""
+import copy
 import os
 import yaml
 
@@ -28,8 +29,8 @@ class ConfigManager:
         Args:
             config_path: Optional path to configuration file to load.
         """
-        # Using shallow copy - this is the bug we need to fix
-        self.config = self.DEFAULT_CONFIG.copy()
+        # Use deep copy to avoid sharing nested mutable defaults across instances
+        self.config = copy.deepcopy(self.DEFAULT_CONFIG)
         
         if config_path:
             self.load(config_path)
@@ -51,8 +52,10 @@ class ConfigManager:
         Args:
             save_path: Path where configuration should be saved.
         """
-        # Bug: doesn't handle case when dirname is empty (saving to current dir)
-        os.makedirs(os.path.dirname(save_path), exist_ok=True)
+        # Create directory only if path includes a directory component
+        dirpath = os.path.dirname(save_path)
+        if dirpath:
+            os.makedirs(dirpath, exist_ok=True)
         
         with open(save_path, 'w') as f:
             yaml.dump(self.config, f, default_flow_style=False)

@@ -14,8 +14,11 @@ cluster:
 
 security:
   enable_ssl: false
-  # WARNING: Do not commit real passwords to version control
-  password: "YourPassword"
+  # SECURITY: Store passwords in environment variables or a secret manager.
+  # Never commit real passwords to version control!
+  # Use: export CLUSTER_PASSWORD="your-secure-password"
+  # Or use a secret management service like HashiCorp Vault, AWS Secrets Manager, etc.
+  password: "${CLUSTER_PASSWORD}"  # Placeholder - replace with env var or secret reference
   
 features:
   enable_ble: false

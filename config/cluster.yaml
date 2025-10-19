@@ -1,0 +1,11 @@
+# NiA-Cluster Configuration
+# This is a sample configuration file for the cluster manager
+# Mount this file to /etc/nia-cluster/config.yaml in the container
+
+cluster:
+  name: myfleet
+  relay_port: 4040
+
+# Note: The current implementation uses command-line arguments
+# This config file is a placeholder for future YAML-based configuration
+# For now, pass configuration via command-line args to the container

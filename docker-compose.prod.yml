@@ -1,0 +1,14 @@
+version: "3.8"
+
+services:
+  nia-cluster:
+    build: .
+    container_name: nia-cluster
+    restart: unless-stopped
+    volumes:
+      - ./config/cluster.yaml:/etc/nia-cluster/config.yaml:ro
+      - ./config/keys:/root/.nia-cluster/keys:rw
+    environment:
+      - NIA_CLUSTER_ENV=production
+    ports:
+      - "2222:22"  # Example mapping for SSH; update according to config

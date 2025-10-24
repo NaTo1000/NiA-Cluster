@@ -67,5 +67,4 @@ jobs:
             --image gcr.io/${PROJECT}/${{ env.IMAGE_NAME }}:${{ github.sha }} \
             --region=${REGION} \
             --platform=managed \
-            --allow-unauthenticated \
             --project=${PROJECT}

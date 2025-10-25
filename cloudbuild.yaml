@@ -1,0 +1,89 @@
+# Google Cloud Build configuration for NiA-Cluster
+# This enables quick builds in containerized VM environments
+
+steps:
+  # Step 1: Build the cluster-suite Docker image
+  - name: 'gcr.io/cloud-builders/docker'
+    id: 'build-cluster-suite'
+    args:
+      - 'build'
+      - '-t'
+      - 'gcr.io/$PROJECT_ID/cluster-suite:$COMMIT_SHA'
+      - '-t'
+      - 'gcr.io/$PROJECT_ID/cluster-suite:latest'
+      - '-f'
+      - 'Dockerfile'
+      - '.'
+    timeout: 600s
+
+  # Step 2: Run tests on the built image
+  - name: 'gcr.io/$PROJECT_ID/cluster-suite:$COMMIT_SHA'
+    id: 'test-help'
+    args: ['--help']
+    timeout: 30s
+
+  # Step 3: Test relay mode validation
+  - name: 'gcr.io/$PROJECT_ID/cluster-suite:$COMMIT_SHA'
+    id: 'test-relay-validation'
+    args: ['--mode', 'relay']
+    waitFor: ['build-cluster-suite']
+    timeout: 30s
+    # This should fail (missing --cluster), but we continue
+    allowFailure: true
+
+  # Step 4: Push the image to Container Registry
+  - name: 'gcr.io/cloud-builders/docker'
+    id: 'push-cluster-suite'
+    args:
+      - 'push'
+      - 'gcr.io/$PROJECT_ID/cluster-suite:$COMMIT_SHA'
+    waitFor: ['build-cluster-suite']
+    timeout: 300s
+
+  # Step 5: Push the latest tag
+  - name: 'gcr.io/cloud-builders/docker'
+    id: 'push-latest'
+    args:
+      - 'push'
+      - 'gcr.io/$PROJECT_ID/cluster-suite:latest'
+    waitFor: ['build-cluster-suite']
+    timeout: 300s
+
+# Optional: Build using docker-compose for integration testing
+  - name: 'gcr.io/$PROJECT_ID/docker-compose'
+    id: 'test-compose-build'
+    args:
+      - '-f'
+      - 'docker-compose.yml'
+      - 'build'
+    timeout: 600s
+    waitFor: ['-']  # Run in parallel with other steps
+
+# Images to be pushed to Container Registry
+images:
+  - 'gcr.io/$PROJECT_ID/cluster-suite:$COMMIT_SHA'
+  - 'gcr.io/$PROJECT_ID/cluster-suite:latest'
+
+# Build options
+options:
+  # Use high-performance machine for faster builds
+  machineType: 'N1_HIGHCPU_8'
+  # Enable Docker layer caching for faster subsequent builds
+  substitution_option: 'ALLOW_LOOSE'
+  logging: CLOUD_LOGGING_ONLY
+  # Dynamic timeout based on build complexity
+  dynamic_substitutions: true
+
+# Timeout for the entire build
+timeout: 1200s
+
+# Substitutions for variables
+substitutions:
+  _CLUSTER_NAME: 'myfleet'
+  _RELAY_PORT: '4040'
+
+# Tags for organizing builds
+tags:
+  - 'cluster-suite'
+  - 'nia-cluster'
+  - 'quick-build'

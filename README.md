@@ -20,6 +20,17 @@ NiA-Cluster is a distributed clustering system that allows multiple nodes to com
 
 This will automatically build the image and start the relay + 2 nodes.
 
+### Option 1b: Using Google Cloud Build (For Cloud Deployments)
+```bash
+# Build with Cloud Build for fast, containerized builds
+./submit-cloud-build.sh root YOUR_PROJECT_ID
+
+# Or build both cluster-suite and nia-enterprise
+./submit-cloud-build.sh both YOUR_PROJECT_ID
+```
+
+See [CLOUD_BUILD.md](CLOUD_BUILD.md) for detailed Cloud Build integration documentation.
+
 ### Option 2: Using Docker Compose (Recommended for Development)
 ```bash
 # Build and start the entire cluster
@@ -123,6 +134,8 @@ Verify the exact commands from the problem statement work:
 - `start-cluster.sh` - Quick start script that builds and launches a complete cluster
 - `test.sh` - Runs basic validation tests on the Docker image
 - `verify-problem-statement.sh` - Verifies that the exact commands from requirements work correctly
+- `submit-cloud-build.sh` - Submit builds to Google Cloud Build for containerized VM builds
+- `build-cloud-local.sh` - Test Cloud Build configurations locally before submission
 
 ## License
 MIT License

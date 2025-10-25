@@ -1,0 +1,58 @@
+schemaVersion: '2.0.0'
+
+# Metadata tests
+metadataTest:
+  labels:
+    - key: 'maintainer'
+      value: 'enterprise@nia-cluster.io'
+    - key: 'version'
+      value: '1.0.0'
+  exposedPorts: ['4040', '8080', '9090']
+  workdir: '/app'
+  user: 'nia'
+
+# Command tests
+commandTests:
+  - name: 'Python version check'
+    command: 'python3'
+    args: ['--version']
+    expectedOutput: ['Python 3.11.*']
+
+  - name: 'Application help command'
+    command: 'python3'
+    args: ['cluster_manager_enterprise.py', '--help']
+    expectedOutput: ['usage:', 'NiA-Enterprise']
+
+  - name: 'Check websockets library'
+    command: 'python3'
+    args: ['-c', 'import websockets; print(websockets.__version__)']
+    excludedError: ['ModuleNotFoundError']
+
+# File existence tests
+fileExistenceTests:
+  - name: 'Application file'
+    path: '/app/cluster_manager_enterprise.py'
+    shouldExist: true
+    permissions: '-rw-r--r--'
+
+  - name: 'Config directory'
+    path: '/config'
+    shouldExist: true
+    permissions: 'drwxr-xr-x'
+
+  - name: 'Certs directory'
+    path: '/certs'
+    shouldExist: true
+    permissions: 'drwxr-xr-x'
+
+# File content tests
+fileContentTests:
+  - name: 'Check Python unbuffered'
+    path: '/proc/1/environ'
+    expectedContents: ['PYTHONUNBUFFERED=1']
+    excludedContents: []
+
+# License tests
+licenseTests:
+  - debian: false
+    files: []

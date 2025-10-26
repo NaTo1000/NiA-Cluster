@@ -1,0 +1,25 @@
+# Example cluster configuration for NiA-Cluster
+# Copy this file to cluster.yaml and customize for your environment
+
+cluster:
+  name: "myfleet"
+  relay_port: 4040
+  nodes:
+    - name: "node1"
+      lan_port: 5001
+      enable_ble: true
+    - name: "node2"
+      lan_port: 5002
+      enable_ble: false
+
+security:
+  enable_ssl: false
+  # SECURITY: Store passwords in environment variables or a secret manager.
+  # Never commit real passwords to version control!
+  # Use: export CLUSTER_PASSWORD="your-secure-password"
+  # Or use a secret management service like HashiCorp Vault, AWS Secrets Manager, etc.
+  password: "${CLUSTER_PASSWORD}"  # Placeholder - replace with env var or secret reference
+  
+features:
+  enable_ble: false
+  auto_discovery: true

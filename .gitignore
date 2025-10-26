@@ -2,3 +2,13 @@
 appengine-generated/
 __pycache__/
 *.pyc
+
+# Secrets and sensitive files
+config/keys/*
+!config/keys/.gitkeep
+*.json
+*.key
+*.pem
+*.crt
+.env
+.env.local

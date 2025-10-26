@@ -13,6 +13,8 @@ NiA-Cluster is a distributed clustering system that allows multiple nodes to com
 
 ## Quick Start
 
+> **Note:** For deploying to Google Cloud Platform (GCR + Cloud Run), see [docs/DEPLOYMENT_GCP.md](docs/DEPLOYMENT_GCP.md). Remember: **never commit secrets to the repository**.
+
 ### Option 1: Using the Startup Script (Easiest)
 ```bash
 ./start-cluster.sh

@@ -1,0 +1,15 @@
+[build-system]
+requires = ["setuptools>=45", "wheel", "setuptools_scm[toml]>=6.2"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "nia-cluster"
+version = "1.0.0"
+description = "Internal WiFi/BLE ESP clustering manager with port control and security"
+requires-python = ">=3.11"
+dependencies = [
+    "websockets>=12.0",
+]
+
+[project.scripts]
+nia-cluster = "nia_cluster.cluster_manager:main"

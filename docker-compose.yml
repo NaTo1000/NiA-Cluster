@@ -31,6 +31,20 @@ services:
     networks:
       - cluster_network
 
+  dashboard:
+    build: .
+    image: cluster-suite:latest
+    container_name: cluster_dashboard
+    entrypoint: ["python3", "dashboard.py"]
+    command: --relay-host cluster_relay --relay-port 4040 --dashboard-port 8080
+    ports:
+      - "8080:8080"
+    depends_on:
+      - cluster_relay
+    networks:
+      - cluster_network
+    restart: unless-stopped
+
 networks:
   cluster_network:
     driver: bridge

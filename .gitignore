@@ -2,3 +2,7 @@
 appengine-generated/
 __pycache__/
 *.pyc
+
+# Test logs and reports
+test-logs/
+*.log

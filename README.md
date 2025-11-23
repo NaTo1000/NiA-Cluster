@@ -10,6 +10,9 @@ NiA-Cluster is a distributed clustering system that allows multiple nodes to com
 - **BLE Support**: Optional Bluetooth Low Energy support for nodes
 - **WebSocket Communication**: Real-time communication between relay and nodes
 - **Auto-discovery**: Nodes automatically discover peers through the relay
+- **Dashboard GUI**: Web-based monitoring dashboard with real-time cluster status
+- **Self-Repair**: Automatic health monitoring and repair of failed components
+- **Auto-Start**: Fool-proof startup scripts for easy deployment
 
 ## Quick Start
 
@@ -33,8 +36,10 @@ See [CLOUD_BUILD.md](CLOUD_BUILD.md) for detailed Cloud Build integration docume
 
 ### Option 2: Using Docker Compose (Recommended for Development)
 ```bash
-# Build and start the entire cluster
+# Build and start the entire cluster with dashboard
 docker compose up --build
+
+# The dashboard will be available at http://localhost:8080
 
 # Stop the cluster
 docker compose down
@@ -81,6 +86,36 @@ No additional options required. The relay will listen on the specified port.
 - `--lan-port`: Node LAN port - **Required**
 - `--enable-ble`: Enable BLE support (optional flag)
 
+## Dashboard & Monitoring
+
+### Auto-Start Dashboard with Self-Repair
+NiA-Cluster includes a web-based monitoring dashboard with automatic health checking and self-repair capabilities.
+
+📘 **[Complete Dashboard Guide](DASHBOARD.md)** - Detailed documentation, configuration, and troubleshooting
+
+#### Quick Start
+```bash
+# With Docker Compose (recommended)
+docker compose up
+
+# Standalone
+./start-dashboard.sh
+
+# Manual
+python3 dashboard.py
+```
+
+Dashboard available at: **http://localhost:8080**
+
+#### Key Features
+- 🎯 **Real-time Status**: Live monitoring of relay and node health
+- 📊 **Metrics**: Active node count, connection status, and uptime
+- 🔧 **Self-Repair**: Automatic detection and logging of failed components
+- 📝 **Repair Log**: Historical log of all repair actions
+- ⚙️ **Configuration**: Toggle self-repair on/off via the UI
+- 🔄 **Auto-Refresh**: Dashboard updates every 5 seconds
+- 🔒 **Security**: Input validation, CORS restrictions, configurable access
+
 ## Architecture
 ```
                     ┌─────────────────┐
@@ -95,6 +130,12 @@ No additional options required. The relay will listen on the specified port.
           │  (Port 5001)   │    │  (Port 5002)  │
           │  BLE Enabled   │    │               │
           └────────────────┘    └───────────────┘
+                             │
+                    ┌────────▼────────┐
+                    │   Dashboard     │
+                    │   (Port 8080)   │
+                    │   Self-Repair   │
+                    └─────────────────┘
 ```
 
 ## Development
@@ -132,6 +173,7 @@ Verify the exact commands from the problem statement work:
 ## Scripts
 
 - `start-cluster.sh` - Quick start script that builds and launches a complete cluster
+- `start-dashboard.sh` - Auto-start dashboard with self-repair and monitoring
 - `test.sh` - Runs basic validation tests on the Docker image
 - `verify-problem-statement.sh` - Verifies that the exact commands from requirements work correctly
 - `submit-cloud-build.sh` - Submit builds to Google Cloud Build for containerized VM builds

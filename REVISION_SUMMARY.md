@@ -12,13 +12,13 @@
 
 ### New Test Suite: `test-debug-failures.sh`
 
-Created comprehensive failure scenario testing with 11 test cases:
+Created comprehensive failure scenario testing with 12 test cases:
 
 #### Test Results
-- **Total Tests:** 11
-- **Passed:** 10
+- **Total Tests:** 12
+- **Passed:** 11
 - **Failed:** 1  
-- **Success Rate:** 90.91%
+- **Success Rate:** 91.67%
 
 #### Test Coverage
 

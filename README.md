@@ -91,40 +91,30 @@ No additional options required. The relay will listen on the specified port.
 ### Auto-Start Dashboard with Self-Repair
 NiA-Cluster includes a web-based monitoring dashboard with automatic health checking and self-repair capabilities.
 
-#### Start Dashboard (Standalone)
+📘 **[Complete Dashboard Guide](DASHBOARD.md)** - Detailed documentation, configuration, and troubleshooting
+
+#### Quick Start
 ```bash
+# With Docker Compose (recommended)
+docker compose up
+
+# Standalone
 ./start-dashboard.sh
+
+# Manual
+python3 dashboard.py
 ```
 
-The dashboard will:
-- Auto-start and remain running with auto-restart on failure
-- Monitor cluster health in real-time
-- Automatically attempt repairs when components fail
-- Provide a web UI at http://localhost:8080
+Dashboard available at: **http://localhost:8080**
 
-#### Dashboard with Docker Compose
-When using `docker compose up`, the dashboard starts automatically and is available at http://localhost:8080
-
-#### Dashboard Features
+#### Key Features
 - 🎯 **Real-time Status**: Live monitoring of relay and node health
 - 📊 **Metrics**: Active node count, connection status, and uptime
-- 🔧 **Self-Repair**: Automatic detection and repair of failed components
+- 🔧 **Self-Repair**: Automatic detection and logging of failed components
 - 📝 **Repair Log**: Historical log of all repair actions
 - ⚙️ **Configuration**: Toggle self-repair on/off via the UI
 - 🔄 **Auto-Refresh**: Dashboard updates every 5 seconds
-
-#### Manual Dashboard Start
-```bash
-python3 dashboard.py --relay-host localhost --relay-port 4040 --dashboard-port 8080
-```
-
-Options:
-- `--relay-host`: Relay server hostname (default: localhost)
-- `--relay-port`: Relay server port (default: 4040)
-- `--dashboard-port`: Dashboard web port (default: 8080)
-- `--check-interval`: Health check interval in seconds (default: 10)
-- `--no-self-repair`: Disable automatic self-repair
-- `--debug`: Enable debug logging
+- 🔒 **Security**: Input validation, CORS restrictions, configurable access
 
 ## Architecture
 ```

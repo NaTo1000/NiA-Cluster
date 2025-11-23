@@ -45,7 +45,8 @@ cluster_state = {
 state_lock = Lock()
 
 app = Flask(__name__)
-CORS(app)
+# Allow CORS only for localhost origins for development
+CORS(app, origins=['http://localhost:*', 'http://127.0.0.1:*'])
 
 
 class ClusterMonitor:
@@ -101,7 +102,15 @@ class ClusterMonitor:
                 await asyncio.sleep(self.check_interval)
     
     def repair_relay(self):
-        """Attempt to repair/restart relay server"""
+        """
+        Attempt to repair/restart relay server
+        
+        Note: In the current implementation, this logs repair attempts but does not
+        perform actual container restarts. In a production environment with proper
+        orchestration (Kubernetes, Docker Swarm), this would trigger actual repairs.
+        For Docker Compose deployments, the 'restart: unless-stopped' policy provides
+        automatic restart on failure.
+        """
         try:
             timestamp = datetime.now().isoformat()
             logger.warning("Attempting to repair relay server...")
@@ -109,15 +118,15 @@ class ClusterMonitor:
             repair_entry = {
                 'timestamp': timestamp,
                 'component': 'relay',
-                'action': 'restart_attempted',
+                'action': 'health_check_failed',
                 'success': False
             }
             
             # In a Docker environment, we can't easily restart containers from within
-            # But we can log the issue and suggest manual intervention
-            logger.info("Relay repair would restart the relay container in production")
+            # But we can log the issue. The docker-compose 'restart' policy handles actual restarts.
+            logger.info("Relay unhealthy. Logged for monitoring. Docker restart policy will handle recovery.")
             repair_entry['success'] = True
-            repair_entry['action'] = 'restart_suggested'
+            repair_entry['action'] = 'logged_for_monitoring'
             
             with state_lock:
                 cluster_state['repair_log'].append(repair_entry)
@@ -126,7 +135,7 @@ class ClusterMonitor:
                     cluster_state['repair_log'] = cluster_state['repair_log'][-50:]
                     
         except Exception as e:
-            logger.error(f"Failed to repair relay: {e}")
+            logger.error(f"Failed to log repair action: {e}")
     
     def start(self):
         """Start monitoring in background thread"""
@@ -161,7 +170,15 @@ def get_status():
 def trigger_repair():
     """Manually trigger repair for a component"""
     data = request.get_json()
+    if not data:
+        return jsonify({'error': 'No data provided'}), 400
+    
     component = data.get('component', 'relay')
+    
+    # Validate component is allowed
+    allowed_components = ['relay', 'node', 'dashboard']
+    if component not in allowed_components:
+        return jsonify({'error': 'Invalid component'}), 400
     
     logger.info(f"Manual repair triggered for {component}")
     
@@ -182,8 +199,14 @@ def config():
     """Get or update dashboard configuration"""
     if request.method == 'POST':
         data = request.get_json()
+        if not data:
+            return jsonify({'error': 'No data provided'}), 400
+        
         with state_lock:
             if 'self_repair_enabled' in data:
+                # Validate boolean value
+                if not isinstance(data['self_repair_enabled'], bool):
+                    return jsonify({'error': 'self_repair_enabled must be boolean'}), 400
                 cluster_state['self_repair_enabled'] = data['self_repair_enabled']
         return jsonify({'status': 'updated'})
     else:
@@ -632,6 +655,8 @@ def main():
                         help='Relay server port (default: 4040)')
     parser.add_argument('--dashboard-port', type=int, default=8080,
                         help='Dashboard web interface port (default: 8080)')
+    parser.add_argument('--dashboard-host', default='0.0.0.0',
+                        help='Dashboard bind address (default: 0.0.0.0 for all interfaces, use 127.0.0.1 for local only)')
     parser.add_argument('--check-interval', type=int, default=10,
                         help='Health check interval in seconds (default: 10)')
     parser.add_argument('--no-self-repair', action='store_true',
@@ -661,11 +686,13 @@ def main():
     monitor.start()
     
     # Start Flask web server
-    logger.info(f"Starting dashboard web interface on port {args.dashboard_port}")
+    logger.info(f"Starting dashboard web interface on {args.dashboard_host}:{args.dashboard_port}")
+    if args.dashboard_host == '0.0.0.0':
+        logger.warning("Dashboard is accessible from all network interfaces. For security, consider using --dashboard-host 127.0.0.1 for local-only access.")
     logger.info(f"Access dashboard at: http://localhost:{args.dashboard_port}")
     
     try:
-        app.run(host='0.0.0.0', port=args.dashboard_port, debug=args.debug, use_reloader=False)
+        app.run(host=args.dashboard_host, port=args.dashboard_port, debug=args.debug, use_reloader=False)
     except KeyboardInterrupt:
         logger.info("Shutting down dashboard...")
         monitor.stop()

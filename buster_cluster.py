@@ -15,14 +15,17 @@ import argparse
 import asyncio
 import json
 import logging
+import secrets
 import sys
 import time
-import random
 import hashlib
 from dataclasses import dataclass, field, asdict
 from datetime import datetime
 from typing import Dict, List, Optional, Set, Tuple
 from enum import Enum, auto
+
+# Cryptographically secure random for security-sensitive operations
+secure_random = secrets.SystemRandom()
 
 try:
     import websockets
@@ -141,7 +144,7 @@ class SecurityAssessor:
             findings.append(f"Region {network.region} has good compliance posture")
 
         # Clamp score between 1-5
-        final_score = max(1, min(5, int(base_score)))
+        final_score = max(1, min(5, round(base_score)))
 
         assessment = {
             'network_id': network.network_id,
@@ -162,6 +165,11 @@ class SecurityAssessor:
 class NetworkSpeedAnalyzer:
     """Analyzes network speed and performance"""
 
+    # Constants for bandwidth scoring
+    BANDWIDTH_SCALE_FACTOR = 10
+    MAX_BANDWIDTH_FOR_SCORE = 1000  # 1000 Mbps = score of 100
+    MAX_LATENCY_FOR_SCORE = 100  # 100ms latency = score of 0
+
     def __init__(self):
         self.measurements: Dict[str, List[dict]] = {}
 
@@ -180,8 +188,8 @@ class NetworkSpeedAnalyzer:
             'hybrid': 30
         }.get(network.provider.lower(), 50)
 
-        # Add some variance
-        variance = random.uniform(-10, 20)
+        # Add some variance using secure random
+        variance = secure_random.uniform(-10, 20)
         measured_latency = max(1, base_latency + variance)
 
         # Store measurement
@@ -210,8 +218,8 @@ class NetworkSpeedAnalyzer:
             'hybrid': 500
         }.get(network.provider.lower(), 100)
 
-        # Add variance
-        variance = random.uniform(-100, 200)
+        # Add variance using secure random
+        variance = secure_random.uniform(-100, 200)
         measured_bandwidth = max(10, base_bandwidth + variance)
 
         # Store measurement
@@ -236,8 +244,8 @@ class NetworkSpeedAnalyzer:
 
         # Calculate performance score (0-100)
         # Lower latency is better, higher bandwidth is better
-        latency_score = max(0, 100 - latency)  # Assumes <100ms is good
-        bandwidth_score = min(100, bandwidth / 10)  # Assumes 1000Mbps = 100
+        latency_score = max(0, self.MAX_LATENCY_FOR_SCORE - latency)
+        bandwidth_score = min(100, bandwidth / self.BANDWIDTH_SCALE_FACTOR)
 
         performance_score = (latency_score * 0.4 + bandwidth_score * 0.6)
 
@@ -418,7 +426,7 @@ class BusterCluster:
         self.optimization_cycle = 0
         self.start_time = time.time()
         self.running = False
-        self.connected_relays: Dict[str, 'websockets.WebSocketClientProtocol'] = {}
+        self.connected_relays: Dict[str, websockets.WebSocketClientProtocol] = {}
 
         # Optimization history
         self.optimization_history: List[OptimizationResult] = []
@@ -567,21 +575,44 @@ class BusterCluster:
         logger.info("Starting autonomous operation loop")
         self.running = True
 
+        consecutive_errors = 0
+        max_consecutive_errors = 5
+
         while self.running:
             try:
                 await self.optimization_cycle_task()
                 await asyncio.sleep(self.OPTIMIZATION_INTERVAL)
+                consecutive_errors = 0  # Reset on success
             except asyncio.CancelledError:
                 logger.info("Autonomous loop cancelled")
                 break
-            except Exception as e:
-                logger.error(f"Error in optimization cycle: {e}")
+            except (ConnectionError, OSError) as e:
+                consecutive_errors += 1
+                logger.error(f"Network error in optimization cycle ({consecutive_errors}/{max_consecutive_errors}): {e}")
+                if consecutive_errors >= max_consecutive_errors:
+                    logger.critical("Too many consecutive network errors, stopping autonomous loop")
+                    self.running = False
+                    raise
+                await asyncio.sleep(self.OPTIMIZATION_INTERVAL)
+            except ValueError as e:
+                logger.error(f"Configuration error in optimization cycle: {e}")
+                await asyncio.sleep(self.OPTIMIZATION_INTERVAL)
+            except RuntimeError as e:
+                logger.error(f"Runtime error in optimization cycle: {e}")
                 await asyncio.sleep(self.OPTIMIZATION_INTERVAL)
 
     async def connect_to_relay(self, network: CloudNetwork) -> bool:
         """Connect to a network's relay server"""
         try:
-            uri = f"ws://{network.endpoint}:{network.port}"
+            # Respect the protocol specified in the endpoint
+            endpoint = network.endpoint
+            if endpoint.startswith('wss://') or endpoint.startswith('ws://'):
+                # Endpoint already includes protocol
+                uri = endpoint
+            else:
+                # Default to ws:// if no protocol specified
+                uri = f"ws://{endpoint}:{network.port}"
+            
             logger.info(f"Connecting to relay at {uri}")
 
             ws = await websockets.connect(uri)
@@ -600,8 +631,12 @@ class BusterCluster:
             logger.info(f"Connected to {network.name}")
             return True
 
-        except Exception as e:
-            logger.error(f"Failed to connect to {network.name}: {e}")
+        except websockets.exceptions.WebSocketException as e:
+            logger.error(f"WebSocket error connecting to {network.name}: {e}")
+            network.status = NetworkStatus.DEGRADED
+            return False
+        except ConnectionError as e:
+            logger.error(f"Connection error to {network.name}: {e}")
             network.status = NetworkStatus.DEGRADED
             return False
 

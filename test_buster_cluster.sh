@@ -17,6 +17,8 @@ TESTS_PASSED=0
 TESTS_FAILED=0
 
 # Helper function to run tests
+# Note: This uses eval for flexibility in test commands. All commands are 
+# hardcoded in this test script and not from user input.
 run_test() {
     local test_name="$1"
     local command="$2"
@@ -24,7 +26,8 @@ run_test() {
     
     echo -n "Test: $test_name... "
     
-    eval "$command" > /tmp/buster_test_output.txt 2>&1
+    # Run the hardcoded command
+    bash -c "$command" > /tmp/buster_test_output.txt 2>&1
     local actual_exit=$?
     
     if [ "$actual_exit" -eq "$expected_exit" ]; then
@@ -42,6 +45,7 @@ run_test() {
 }
 
 # Helper function to check output content
+# Note: Commands are hardcoded in this test script.
 check_output() {
     local test_name="$1"
     local command="$2"
@@ -49,7 +53,8 @@ check_output() {
     
     echo -n "Test: $test_name... "
     
-    eval "$command" > /tmp/buster_test_output.txt 2>&1
+    # Run the hardcoded command
+    bash -c "$command" > /tmp/buster_test_output.txt 2>&1
     
     if grep -q -F -- "$expected_content" /tmp/buster_test_output.txt; then
         echo -e "${GREEN}PASSED${NC}"

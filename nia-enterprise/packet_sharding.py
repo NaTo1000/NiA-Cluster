@@ -550,13 +550,13 @@ class PacketShardManager:
             return None
         
         # Sort shards by sequence and concatenate
+        # Note: The shuffle only affects transmission order, not the data.
+        # Each shard's data corresponds to its sequence number, so we just
+        # need to sort by sequence to reconstruct the original packet.
         sorted_shards = [shards_dict[i] for i in sorted(shards_dict.keys())]
         
-        # Apply unshuffle to restore original order
-        unshuffled = self.shuffler.unshuffle(sorted_shards, total_shards)
-        
-        # Concatenate data
-        packet_data = b''.join(shard.data for shard in unshuffled)
+        # Concatenate data in sequence order
+        packet_data = b''.join(shard.data for shard in sorted_shards)
         
         # Calculate assembly time
         assembly_time = time.time() - metadata.get('first_received', time.time())

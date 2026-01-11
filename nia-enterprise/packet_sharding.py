@@ -85,6 +85,10 @@ class QuantumSuperpositionOptimizer:
     by maintaining probability amplitudes for different routing paths and
     collapsing to optimal solutions based on measured performance.
     """
+    
+    # Phase scaling factor for converting performance metrics to phase shifts.
+    # Using π ensures full range of constructive/destructive interference.
+    PERFORMANCE_PHASE_SCALE = math.pi
 
     def __init__(self, num_paths: int = 4, coherence_factor: float = 0.9):
         """
@@ -99,6 +103,8 @@ class QuantumSuperpositionOptimizer:
         self.path_amplitudes: Dict[str, List[float]] = {}
         self.measurement_history: Dict[str, List[Tuple[int, float]]] = defaultdict(list)
         self._phase_offsets: Dict[str, List[float]] = {}
+        # Pre-calculate uniform amplitude for efficiency
+        self._uniform_amplitude = 1.0 / math.sqrt(self.num_paths)
 
     def initialize_superposition(self, packet_id: str) -> List[float]:
         """
@@ -108,8 +114,7 @@ class QuantumSuperpositionOptimizer:
         representing the packet existing in all paths simultaneously.
         """
         # Initialize with equal probability amplitudes (normalized)
-        amplitude = 1.0 / math.sqrt(self.num_paths)
-        amplitudes = [amplitude] * self.num_paths
+        amplitudes = [self._uniform_amplitude] * self.num_paths
         
         # Add random phase offsets for interference patterns
         phases = [random.uniform(0, 2 * math.pi) for _ in range(self.num_paths)]
@@ -130,8 +135,8 @@ class QuantumSuperpositionOptimizer:
         if packet_id not in self.path_amplitudes:
             self.initialize_superposition(packet_id)
         
-        # Normalize performance to [0, 2π] phase shift
-        phase_shift = performance_metric * math.pi
+        # Scale performance to phase shift using defined constant
+        phase_shift = performance_metric * self.PERFORMANCE_PHASE_SCALE
         self._phase_offsets[packet_id][path_index] += phase_shift
         
         # Update amplitude through interference
@@ -154,6 +159,9 @@ class QuantumSuperpositionOptimizer:
         if total > 0:
             norm_factor = 1.0 / math.sqrt(total)
             self.path_amplitudes[packet_id] = [a * norm_factor for a in amplitudes]
+        else:
+            # Handle zero amplitude case - reset to uniform distribution
+            self.path_amplitudes[packet_id] = [self._uniform_amplitude] * self.num_paths
 
     def collapse_to_path(self, packet_id: str) -> int:
         """
@@ -316,16 +324,16 @@ class DoublePacketShuffle:
             block_end = min(block_start + self.block_size, len(shards))
             block = shards[block_start:block_end]
             
-            # Initialize superposition for this block
+            # Initialize superposition for this block (block-level state)
             block_id = f"block_{block_start}"
             self.quantum_optimizer.initialize_superposition(block_id)
             
-            # Assign quantum states to each shard in the block
+            # Assign quantum states to each shard using the block's collective state
             ordered_block: List[Tuple[float, PacketShard]] = []
             for i, shard in enumerate(block):
-                # Collapse superposition to get priority ordering
-                path = self.quantum_optimizer.collapse_to_path(f"{block_id}_{i}")
-                shard.superposition_state = path / self.block_size
+                # Collapse superposition using block-level state for consistent optimization
+                path = self.quantum_optimizer.collapse_to_path(block_id)
+                shard.superposition_state = (path + i) / max(self.block_size, len(block))
                 ordered_block.append((shard.superposition_state, shard))
             
             # Sort by quantum state for optimal ordering
@@ -506,10 +514,13 @@ class PacketShardManager:
         # Initialize storage for this packet if needed
         if packet_id not in self.pending_packets:
             self.pending_packets[packet_id] = {}
+            # Get optimal route for this packet using quantum optimization
+            selected_route = self.quantum_optimizer.collapse_to_path(packet_id)
             self.packet_metadata[packet_id] = {
                 'total_shards': shard.total_shards,
                 'first_received': time.time(),
-                'priority': shard.priority
+                'priority': shard.priority,
+                'route': selected_route  # Track route for performance feedback
             }
         
         # Store the shard
@@ -564,8 +575,9 @@ class PacketShardManager:
         logger.info(f"Reformed packet {packet_id[:8]}: {len(packet_data)} bytes "
                    f"from {total_shards} shards in {assembly_time:.3f}s")
         
-        # Record measurement for quantum optimization
-        self.quantum_optimizer.record_measurement(packet_id, 0, assembly_time * 1000)
+        # Record measurement for quantum optimization using the actual route
+        route = metadata.get('route', 0)
+        self.quantum_optimizer.record_measurement(packet_id, route, assembly_time * 1000)
         
         # Cleanup
         self._cleanup_packet(packet_id)

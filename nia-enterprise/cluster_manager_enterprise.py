@@ -304,6 +304,7 @@ class EnterpriseClusterRelay:
         
         # Get optimal route using quantum superposition collapse
         packet_id = shards[0].packet_id if shards else None
+        route = 0
         if packet_id:
             route = self.shard_manager.get_optimal_route(packet_id)
             logger.debug(f"Quantum-optimized route {route} selected for packet {packet_id[:8]}")
@@ -322,10 +323,10 @@ class EnterpriseClusterRelay:
             if PROMETHEUS_AVAILABLE:
                 SHARDS_PROCESSED.inc()
         
-        # Record transmission result for quantum optimization
+        # Record transmission result for quantum optimization using actual route
         latency_ms = (time.time() - start_time) * 1000
         if packet_id:
-            self.shard_manager.record_transmission_result(packet_id, 0, latency_ms)
+            self.shard_manager.record_transmission_result(packet_id, route, latency_ms)
         
         logger.info(f"Sent {len(prepared_shards)} shards to {target} "
                    f"(packet {packet_id[:8] if packet_id else 'unknown'}, {latency_ms:.2f}ms)")
@@ -588,10 +589,16 @@ class EnterpriseClusterNode:
         if not self.connected or not self.websocket:
             raise RuntimeError("Not connected to relay")
         
+        # Handle bytes with proper error handling for non-UTF-8 data
+        if isinstance(data, bytes):
+            data_str = data.decode('utf-8', errors='replace')
+        else:
+            data_str = data
+        
         message = {
             'type': 'sharded_message',
             'target': target,
-            'data': data.decode('utf-8') if isinstance(data, bytes) else data,
+            'data': data_str,
             'priority': priority,
             'timestamp': datetime.now().isoformat()
         }

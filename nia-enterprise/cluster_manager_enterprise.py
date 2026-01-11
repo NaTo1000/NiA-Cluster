@@ -2,6 +2,11 @@
 """
 NiA-Enterprise Cluster Manager
 Enterprise-grade WiFi/BLE ESP clustering manager with advanced security and monitoring
+
+Features:
+- High-performance packet sharding and reforming
+- Optimized double packet shuffle for transmission efficiency
+- Quantum superposition-inspired routing optimization
 """
 import argparse
 import asyncio
@@ -11,7 +16,7 @@ import sys
 import ssl
 import time
 from datetime import datetime
-from typing import Set, Dict, Optional
+from typing import Set, Dict, Optional, List
 from pathlib import Path
 
 try:
@@ -20,6 +25,17 @@ try:
 except ImportError:
     print("Error: websockets library not installed. Run: pip install websockets")
     sys.exit(1)
+
+try:
+    from packet_sharding import (
+        PacketShardManager,
+        PacketShard,
+        create_sharding_system
+    )
+    SHARDING_AVAILABLE = True
+except ImportError:
+    SHARDING_AVAILABLE = False
+    print("Warning: packet_sharding module not available. Sharding disabled.")
 
 try:
     from prometheus_client import Counter, Gauge, Histogram, start_http_server
@@ -40,6 +56,13 @@ if PROMETHEUS_AVAILABLE:
     MESSAGE_COUNTER = Counter('nia_messages_total', 'Total messages processed', ['type'])
     RESPONSE_TIME = Histogram('nia_response_time_seconds', 'Response time in seconds')
     AUTH_FAILURES = Counter('nia_auth_failures_total', 'Total authentication failures')
+    SHARDS_PROCESSED = Counter('nia_shards_processed_total', 'Total shards processed')
+    PACKETS_REFORMED = Counter('nia_packets_reformed_total', 'Total packets reformed from shards')
+
+
+# Default sharding configuration
+DEFAULT_SHARD_SIZE = 1024  # bytes
+DEFAULT_SHUFFLE_BLOCK_SIZE = 8
 
 
 class SecurityManager:
@@ -69,12 +92,14 @@ class SecurityManager:
 
 
 class EnterpriseClusterRelay:
-    """Enterprise relay server with HA and monitoring"""
+    """Enterprise relay server with HA, monitoring, and packet sharding"""
     
     def __init__(self, port: int, cluster_name: str, enable_tls: bool = False,
                  tls_cert: Optional[str] = None, tls_key: Optional[str] = None,
                  api_keys: Optional[Dict[str, str]] = None, ha_enabled: bool = False,
-                 peer_relays: Optional[list] = None):
+                 peer_relays: Optional[list] = None, enable_sharding: bool = True,
+                 shard_size: int = DEFAULT_SHARD_SIZE,
+                 shuffle_block_size: int = DEFAULT_SHUFFLE_BLOCK_SIZE):
         self.port = port
         self.cluster_name = cluster_name
         self.enable_tls = enable_tls
@@ -82,10 +107,22 @@ class EnterpriseClusterRelay:
         self.tls_key = tls_key
         self.ha_enabled = ha_enabled
         self.peer_relays = peer_relays or []
+        self.enable_sharding = enable_sharding and SHARDING_AVAILABLE
         
         self.nodes: Dict[str, WebSocketServerProtocol] = {}
         self.node_info: Dict[str, dict] = {}
         self.security = SecurityManager(api_keys)
+        
+        # Initialize packet sharding system if enabled
+        if self.enable_sharding:
+            self.shard_manager = create_sharding_system(
+                shard_size=shard_size,
+                shuffle_block_size=shuffle_block_size
+            )
+            logger.info(f"Packet sharding enabled (shard_size={shard_size}, "
+                       f"shuffle_block_size={shuffle_block_size})")
+        else:
+            self.shard_manager = None
         
         # Metrics
         self.start_time = time.time()
@@ -206,6 +243,14 @@ class EnterpriseClusterRelay:
                             'data': data.get('data'),
                             'timestamp': datetime.now().isoformat()
                         }))
+                
+                elif msg_type == 'sharded_message':
+                    # Handle sharded message transmission with quantum optimization
+                    await self._handle_sharded_message(websocket, node_name, data)
+                
+                elif msg_type == 'shard':
+                    # Handle individual shard reception
+                    await self._handle_shard_reception(websocket, node_name, data)
                         
         except websockets.exceptions.ConnectionClosed:
             logger.info(f"Connection closed for node '{node_name}'")
@@ -215,18 +260,147 @@ class EnterpriseClusterRelay:
             if node_name:
                 await self.unregister_node(node_name)
     
+    async def _handle_sharded_message(self, websocket, node_name: str, data: dict):
+        """
+        Handle a sharded message transmission request.
+        
+        Shards the message payload using double packet shuffle with
+        quantum superposition optimization and sends to target.
+        """
+        if not self.enable_sharding or not self.shard_manager:
+            # Fall back to regular message handling
+            target = data.get('target')
+            if target in self.nodes:
+                await self.nodes[target].send(json.dumps({
+                    'type': 'message',
+                    'from': node_name,
+                    'data': data.get('data'),
+                    'timestamp': datetime.now().isoformat()
+                }))
+            return
+        
+        target = data.get('target')
+        payload = data.get('data', '')
+        priority = data.get('priority', 0)
+        
+        if target not in self.nodes:
+            await websocket.send(json.dumps({
+                'type': 'error',
+                'message': f'Target node {target} not found'
+            }))
+            return
+        
+        # Convert payload to bytes if necessary
+        if isinstance(payload, str):
+            payload_bytes = payload.encode('utf-8')
+        elif isinstance(payload, dict):
+            payload_bytes = json.dumps(payload).encode('utf-8')
+        else:
+            payload_bytes = bytes(payload)
+        
+        # Shard the packet using quantum-optimized double shuffle
+        shards = self.shard_manager.shard_packet(payload_bytes, priority=priority)
+        prepared_shards = self.shard_manager.prepare_for_transmission(shards)
+        
+        # Get optimal route using quantum superposition collapse
+        packet_id = shards[0].packet_id if shards else None
+        if packet_id:
+            route = self.shard_manager.get_optimal_route(packet_id)
+            logger.debug(f"Quantum-optimized route {route} selected for packet {packet_id[:8]}")
+        
+        # Send each shard to the target
+        start_time = time.time()
+        for shard in prepared_shards:
+            shard_message = {
+                'type': 'shard',
+                'from': node_name,
+                'shard': shard.to_dict(),
+                'timestamp': datetime.now().isoformat()
+            }
+            await self.nodes[target].send(json.dumps(shard_message))
+            
+            if PROMETHEUS_AVAILABLE:
+                SHARDS_PROCESSED.inc()
+        
+        # Record transmission result for quantum optimization
+        latency_ms = (time.time() - start_time) * 1000
+        if packet_id:
+            self.shard_manager.record_transmission_result(packet_id, 0, latency_ms)
+        
+        logger.info(f"Sent {len(prepared_shards)} shards to {target} "
+                   f"(packet {packet_id[:8] if packet_id else 'unknown'}, {latency_ms:.2f}ms)")
+        
+        # Acknowledge transmission to sender
+        await websocket.send(json.dumps({
+            'type': 'sharded_message_sent',
+            'packet_id': packet_id,
+            'shards_sent': len(prepared_shards),
+            'target': target,
+            'latency_ms': latency_ms,
+            'timestamp': datetime.now().isoformat()
+        }))
+    
+    async def _handle_shard_reception(self, websocket, node_name: str, data: dict):
+        """
+        Handle reception of an individual shard.
+        
+        Receives shards and attempts to reform complete packets.
+        """
+        if not self.enable_sharding or not self.shard_manager:
+            logger.warning("Received shard but sharding is disabled")
+            return
+        
+        shard_data = data.get('shard')
+        if not shard_data:
+            logger.warning("Received shard message without shard data")
+            return
+        
+        try:
+            shard = PacketShard.from_dict(shard_data)
+            
+            if PROMETHEUS_AVAILABLE:
+                SHARDS_PROCESSED.inc()
+            
+            # Attempt to reform the packet
+            reformed_data = self.shard_manager.receive_shard(shard)
+            
+            if reformed_data is not None:
+                # Packet is complete, notify the receiver
+                if PROMETHEUS_AVAILABLE:
+                    PACKETS_REFORMED.inc()
+                
+                logger.info(f"Reformed packet {shard.packet_id[:8]}: {len(reformed_data)} bytes")
+                
+                await websocket.send(json.dumps({
+                    'type': 'packet_reformed',
+                    'packet_id': shard.packet_id,
+                    'data': reformed_data.decode('utf-8', errors='replace'),
+                    'size': len(reformed_data),
+                    'timestamp': datetime.now().isoformat()
+                }))
+            
+        except Exception as e:
+            logger.error(f"Error processing shard: {e}")
+    
     async def health_check_server(self):
         """Simple HTTP health check endpoint"""
         from aiohttp import web
         
         async def health(request):
-            return web.json_response({
+            response = {
                 'status': 'healthy',
                 'cluster': self.cluster_name,
                 'nodes_connected': len(self.nodes),
                 'uptime_seconds': int(time.time() - self.start_time),
-                'version': '1.0.0-enterprise'
-            })
+                'version': '1.0.0-enterprise',
+                'sharding_enabled': self.enable_sharding
+            }
+            
+            # Add sharding stats if enabled
+            if self.enable_sharding and self.shard_manager:
+                response['pending_packets'] = self.shard_manager.get_pending_packets_count()
+            
+            return web.json_response(response)
         
         app = web.Application()
         app.router.add_get('/health', health)
@@ -260,6 +434,7 @@ class EnterpriseClusterRelay:
         logger.info(f"Cluster: {self.cluster_name}")
         logger.info(f"TLS: {'enabled' if self.enable_tls else 'disabled'}")
         logger.info(f"HA Mode: {'enabled' if self.ha_enabled else 'disabled'}")
+        logger.info(f"Packet Sharding: {'enabled' if self.enable_sharding else 'disabled'}")
         
         async with websockets.serve(
             self.handle_client,
@@ -272,12 +447,14 @@ class EnterpriseClusterRelay:
 
 
 class EnterpriseClusterNode:
-    """Enterprise cluster node with advanced monitoring"""
+    """Enterprise cluster node with advanced monitoring and packet sharding"""
     
     def __init__(self, cluster_name: str, node_name: str, relay_host: str,
                  relay_port: int, lan_port: int, enable_ble: bool = False,
                  api_key: Optional[str] = None, enable_tls: bool = False,
-                 version: str = "1.0.0-enterprise"):
+                 version: str = "1.0.0-enterprise", enable_sharding: bool = True,
+                 shard_size: int = DEFAULT_SHARD_SIZE,
+                 shuffle_block_size: int = DEFAULT_SHUFFLE_BLOCK_SIZE):
         self.cluster_name = cluster_name
         self.node_name = node_name
         self.relay_host = relay_host
@@ -287,9 +464,20 @@ class EnterpriseClusterNode:
         self.api_key = api_key
         self.enable_tls = enable_tls
         self.version = version
+        self.enable_sharding = enable_sharding and SHARDING_AVAILABLE
         self.websocket = None
         self.connected = False
         self.peer_nodes: Dict[str, dict] = {}
+        
+        # Initialize packet sharding system if enabled
+        if self.enable_sharding:
+            self.shard_manager = create_sharding_system(
+                shard_size=shard_size,
+                shuffle_block_size=shuffle_block_size
+            )
+            logger.info(f"Node packet sharding enabled (shard_size={shard_size})")
+        else:
+            self.shard_manager = None
         
     async def send_heartbeat(self):
         """Send periodic heartbeat to relay"""
@@ -326,6 +514,20 @@ class EnterpriseClusterNode:
                     
                 elif msg_type == 'heartbeat_ack':
                     logger.debug("Heartbeat acknowledged")
+                
+                elif msg_type == 'shard':
+                    # Handle incoming shard from relay
+                    await self._handle_incoming_shard(data)
+                
+                elif msg_type == 'packet_reformed':
+                    # Complete packet has been reformed
+                    logger.info(f"Received complete packet {data.get('packet_id', 'unknown')[:8]}: "
+                               f"{data.get('size', 0)} bytes")
+                
+                elif msg_type == 'sharded_message_sent':
+                    # Acknowledgment of sharded message transmission
+                    logger.debug(f"Sharded message {data.get('packet_id', '')[:8]} sent to "
+                                f"{data.get('target')} ({data.get('shards_sent')} shards)")
                     
         except websockets.exceptions.ConnectionClosed:
             logger.info("Connection to relay closed")
@@ -333,6 +535,69 @@ class EnterpriseClusterNode:
         except Exception as e:
             logger.error(f"Error handling messages: {e}")
             self.connected = False
+    
+    async def _handle_incoming_shard(self, data: dict):
+        """Handle reception of an individual shard."""
+        if not self.enable_sharding or not self.shard_manager:
+            logger.warning("Received shard but sharding is disabled on this node")
+            return
+        
+        shard_data = data.get('shard')
+        if not shard_data:
+            logger.warning("Received shard message without shard data")
+            return
+        
+        try:
+            shard = PacketShard.from_dict(shard_data)
+            source = data.get('from', 'unknown')
+            
+            # Attempt to reform the packet
+            reformed_data = self.shard_manager.receive_shard(shard)
+            
+            if reformed_data is not None:
+                logger.info(f"Reformed packet {shard.packet_id[:8]} from {source}: "
+                           f"{len(reformed_data)} bytes")
+                
+                # Notify application of complete packet
+                await self._on_packet_complete(shard.packet_id, reformed_data, source)
+                
+        except Exception as e:
+            logger.error(f"Error processing incoming shard: {e}")
+    
+    async def _on_packet_complete(self, packet_id: str, data: bytes, source: str):
+        """
+        Called when a complete packet has been reformed from shards.
+        
+        Override this method to handle completed packets in your application.
+        """
+        # Default implementation just logs the event
+        logger.info(f"Complete packet {packet_id[:8]} received from {source}")
+    
+    async def send_sharded_message(self, target: str, data: bytes, priority: int = 0):
+        """
+        Send a message using optimized packet sharding.
+        
+        Uses double packet shuffle with quantum superposition optimization
+        for efficient transmission.
+        
+        Args:
+            target: Target node name
+            data: Message data to send
+            priority: Message priority (higher = more important)
+        """
+        if not self.connected or not self.websocket:
+            raise RuntimeError("Not connected to relay")
+        
+        message = {
+            'type': 'sharded_message',
+            'target': target,
+            'data': data.decode('utf-8') if isinstance(data, bytes) else data,
+            'priority': priority,
+            'timestamp': datetime.now().isoformat()
+        }
+        
+        await self.websocket.send(json.dumps(message))
+        logger.debug(f"Sent sharded message request to {target}")
     
     async def connect_to_relay(self):
         """Connect to the relay server"""
@@ -377,6 +642,7 @@ class EnterpriseClusterNode:
         logger.info(f"Starting Enterprise Node '{self.node_name}'")
         logger.info(f"Cluster: {self.cluster_name}")
         logger.info(f"BLE: {'enabled' if self.enable_ble else 'disabled'}")
+        logger.info(f"Packet Sharding: {'enabled' if self.enable_sharding else 'disabled'}")
         logger.info(f"Version: {self.version}")
         
         await self.connect_to_relay()
@@ -421,14 +687,27 @@ def main():
     parser.add_argument('--api-key',
                        help='API key for authentication')
     
+    # Packet sharding arguments
+    parser.add_argument('--enable-sharding', action='store_true', default=True,
+                       help='Enable packet sharding with quantum optimization (default: enabled)')
+    parser.add_argument('--disable-sharding', action='store_true',
+                       help='Disable packet sharding')
+    parser.add_argument('--shard-size', type=int, default=DEFAULT_SHARD_SIZE,
+                       help=f'Shard size in bytes (default: {DEFAULT_SHARD_SIZE})')
+    parser.add_argument('--shuffle-block-size', type=int, default=DEFAULT_SHUFFLE_BLOCK_SIZE,
+                       help=f'Double shuffle block size (default: {DEFAULT_SHUFFLE_BLOCK_SIZE})')
+    
     parser.add_argument('--debug', action='store_true',
                        help='Enable debug logging')
-    parser.add_argument('--version', action='version', version='NiA-Enterprise 1.0.0')
+    parser.add_argument('--version', action='version', version='NiA-Enterprise 1.1.0')
     
     args = parser.parse_args()
     
     if args.debug:
         logging.getLogger().setLevel(logging.DEBUG)
+    
+    # Determine sharding state
+    enable_sharding = not args.disable_sharding
     
     try:
         if args.mode == 'relay':
@@ -452,7 +731,10 @@ def main():
                 tls_key=args.tls_key,
                 api_keys=api_keys,
                 ha_enabled=args.ha_enabled,
-                peer_relays=peer_relays
+                peer_relays=peer_relays,
+                enable_sharding=enable_sharding,
+                shard_size=args.shard_size,
+                shuffle_block_size=args.shuffle_block_size
             )
             asyncio.run(relay.start())
             
@@ -474,7 +756,10 @@ def main():
                 args.lan_port,
                 args.enable_ble,
                 args.api_key,
-                args.enable_tls
+                args.enable_tls,
+                enable_sharding=enable_sharding,
+                shard_size=args.shard_size,
+                shuffle_block_size=args.shuffle_block_size
             )
             asyncio.run(node.start())
             

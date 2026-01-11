@@ -724,8 +724,8 @@ def main():
             
             # Start relay server
             relay = EnterpriseClusterRelay(
-                args.relay_port,
-                args.cluster,
+                port=args.relay_port,
+                cluster_name=args.cluster,
                 enable_tls=args.enable_tls,
                 tls_cert=args.tls_cert,
                 tls_key=args.tls_key,
@@ -749,14 +749,14 @@ def main():
             
             # Start node
             node = EnterpriseClusterNode(
-                args.cluster,
-                args.node,
-                args.relay_host,
-                args.relay_port,
-                args.lan_port,
-                args.enable_ble,
-                args.api_key,
-                args.enable_tls,
+                cluster_name=args.cluster,
+                node_name=args.node,
+                relay_host=args.relay_host,
+                relay_port=args.relay_port,
+                lan_port=args.lan_port,
+                enable_ble=args.enable_ble,
+                api_key=args.api_key,
+                enable_tls=args.enable_tls,
                 enable_sharding=enable_sharding,
                 shard_size=args.shard_size,
                 shuffle_block_size=args.shuffle_block_size

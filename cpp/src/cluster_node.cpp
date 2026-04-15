@@ -168,6 +168,16 @@ void ClusterNode::send_heartbeat()
     }
 }
 
+void ClusterNode::disconnect()
+{
+    if (!connected_) return;
+
+    connected_ = false;
+    beast::error_code ec;
+    ws_.close(ws::close_code::normal, ec);
+    // ec intentionally ignored: the socket may already be closing
+}
+
 void ClusterNode::start()
 {
     log_info("Starting node '" + node_name_ + "' in cluster '" + cluster_name_ + "'");

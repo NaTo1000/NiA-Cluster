@@ -5,6 +5,7 @@ add_executable(nia-cluster-tests
     test_message_types.cpp
     test_cluster_relay.cpp
     test_cluster_node.cpp
+    test_integration.cpp
 )
 
 target_link_libraries(nia-cluster-tests PRIVATE

@@ -27,12 +27,20 @@ ClusterRelay::ClusterRelay(uint16_t port, std::string cluster_name)
     , cluster_name_(std::move(cluster_name))
 {}
 
+ClusterRelay::~ClusterRelay()
+{
+    stop();
+}
+
 void ClusterRelay::register_node(const std::string& node_name,
                                   const NodeInfo& info,
                                   std::shared_ptr<RelaySession> session)
 {
-    sessions_[node_name]  = std::move(session);
-    node_info_[node_name] = info;
+    {
+        std::lock_guard<std::mutex> lock(state_mutex_);
+        sessions_[node_name]  = std::move(session);
+        node_info_[node_name] = info;
+    }
 
     log_info("Node '" + node_name + "' registered (BLE: " +
              (info.ble_enabled ? "true" : "false") + ")");
@@ -42,8 +50,11 @@ void ClusterRelay::register_node(const std::string& node_name,
 
 void ClusterRelay::unregister_node(const std::string& node_name)
 {
-    sessions_.erase(node_name);
-    node_info_.erase(node_name);
+    {
+        std::lock_guard<std::mutex> lock(state_mutex_);
+        sessions_.erase(node_name);
+        node_info_.erase(node_name);
+    }
 
     log_info("Node '" + node_name + "' unregistered");
 
@@ -52,12 +63,24 @@ void ClusterRelay::unregister_node(const std::string& node_name)
 
 void ClusterRelay::broadcast_node_list()
 {
+    // Build a snapshot of the current node list and active sessions while
+    // holding the lock, so we do not hold it while doing I/O.
     NodeListMessage nlm;
-    nlm.nodes = node_info_;
-    auto payload = nlm.to_json();
+    std::vector<std::pair<std::string, std::shared_ptr<RelaySession>>> snapshot;
 
+    {
+        std::lock_guard<std::mutex> lock(state_mutex_);
+        nlm.nodes = node_info_;
+        for (auto& [name, session] : sessions_) {
+            if (session)  // Skip null sessions (used in unit tests without live sockets)
+                snapshot.emplace_back(name, session);
+        }
+    }
+
+    auto payload = nlm.to_json();
     std::vector<std::string> dead;
-    for (auto& [name, session] : sessions_) {
+
+    for (auto& [name, session] : snapshot) {
         try {
             session->send(payload);
         } catch (const std::exception& ex) {
@@ -65,6 +88,7 @@ void ClusterRelay::broadcast_node_list()
             dead.push_back(name);
         }
     }
+
     for (const auto& name : dead)
         unregister_node(name);
 }
@@ -72,8 +96,21 @@ void ClusterRelay::broadcast_node_list()
 std::shared_ptr<RelaySession>
 ClusterRelay::find_session(const std::string& node_name) const
 {
+    std::lock_guard<std::mutex> lock(state_mutex_);
     auto it = sessions_.find(node_name);
     return it != sessions_.end() ? it->second : nullptr;
+}
+
+size_t ClusterRelay::node_count() const
+{
+    std::lock_guard<std::mutex> lock(state_mutex_);
+    return node_info_.size();
+}
+
+bool ClusterRelay::has_node(const std::string& name) const
+{
+    std::lock_guard<std::mutex> lock(state_mutex_);
+    return node_info_.count(name) > 0;
 }
 
 void ClusterRelay::start()
@@ -81,24 +118,75 @@ void ClusterRelay::start()
     log_info("Starting relay server for cluster '" + cluster_name_ +
              "' on port " + std::to_string(port_));
 
+    beast::error_code ec;
     auto endpoint = tcp::endpoint(asio::ip::make_address("0.0.0.0"), port_);
-    tcp::acceptor acceptor(ioc_, endpoint);
+
+    acceptor_.open(endpoint.protocol(), ec);
+    if (ec) throw std::runtime_error("acceptor open failed: " + ec.message());
+
+    acceptor_.set_option(asio::socket_base::reuse_address(true), ec);
+    acceptor_.bind(endpoint, ec);
+    if (ec) throw std::runtime_error("acceptor bind failed: " + ec.message());
+
+    acceptor_.listen(asio::socket_base::max_listen_connections, ec);
+    if (ec) throw std::runtime_error("acceptor listen failed: " + ec.message());
 
     log_info("Relay server running on ws://0.0.0.0:" + std::to_string(port_));
 
-    // Synchronous accept loop
-    for (;;) {
-        tcp::socket socket(ioc_);
-        beast::error_code ec;
-        acceptor.accept(socket, ec);
-        if (ec) {
-            log_error("Accept error: " + ec.message());
-            continue;
-        }
-
-        auto session = std::make_shared<RelaySession>(std::move(socket), *this);
-        session->start();
+    // Signal start_async() (if used) that we are now accepting connections.
+    {
+        std::lock_guard<std::mutex> lock(state_mutex_);
+        listening_ = true;
     }
+    listen_cv_.notify_one();
+
+    do_accept();
+    ioc_.run();
+}
+
+void ClusterRelay::do_accept()
+{
+    acceptor_.async_accept(
+        [this](beast::error_code ec, tcp::socket socket) {
+            if (ec == asio::error::operation_aborted || !acceptor_.is_open())
+                return;
+
+            if (ec) {
+                log_error("Accept error: " + ec.message());
+            } else {
+                auto session = std::make_shared<RelaySession>(std::move(socket), *this);
+                // Each session runs on its own detached thread with blocking I/O.
+                // TODO: track session threads in a container for graceful shutdown
+                //       once a thread-pool or session registry is added.
+                std::thread([session]() { session->start(); }).detach();
+            }
+
+            do_accept();
+        });
+}
+
+void ClusterRelay::start_async()
+{
+    server_thread_ = std::thread([this] { start(); });
+    // Block until the acceptor is bound and listening (avoids race in tests).
+    std::unique_lock<std::mutex> lock(state_mutex_);
+    listen_cv_.wait(lock, [this] { return listening_; });
+}
+
+void ClusterRelay::stop()
+{
+    if (!server_thread_.joinable()) return;
+
+    {
+        std::lock_guard<std::mutex> lock(state_mutex_);
+        listening_ = false;
+    }
+
+    beast::error_code ec;
+    acceptor_.cancel(ec);
+    ioc_.stop();
+
+    server_thread_.join();
 }
 
 // ── RelaySession ──────────────────────────────────────────────────────────────
@@ -160,18 +248,23 @@ void RelaySession::handle_message(const nlohmann::json& msg)
         node_name_ = rm.node_name;
 
         NodeInfo info;
-        info.name        = rm.node_name;
+        info.name         = rm.node_name;
         info.connected_at = now_iso8601();
-        info.lan_port    = rm.lan_port;
-        info.ble_enabled = rm.ble_enabled;
-        info.cluster     = rm.cluster.empty() ? relay_.cluster_name() : rm.cluster;
+        info.lan_port     = rm.lan_port;
+        info.ble_enabled  = rm.ble_enabled;
+        info.cluster      = rm.cluster.empty() ? relay_.cluster_name() : rm.cluster;
 
-        relay_.register_node(node_name_, info, shared_from_this());
-
+        // Send "registered" ack BEFORE broadcasting the node list so that
+        // the connecting node always receives its ack as the first message
+        // (ClusterNode::connect_to_relay() reads exactly one message and
+        // expects "registered").
         RegisteredMessage ack;
         ack.node_name = node_name_;
         ack.cluster   = relay_.cluster_name();
         send(ack.to_json());
+
+        // Now register (broadcasts updated node_list to all nodes).
+        relay_.register_node(node_name_, info, shared_from_this());
         break;
     }
     case MessageType::Heartbeat: {

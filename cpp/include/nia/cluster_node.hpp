@@ -42,11 +42,13 @@ public:
 
     ~ClusterNode();
 
-    /// Establish the WebSocket connection and send the register message.
+    /// Establish the WebSocket connection, send the register message, and wait
+    /// for the "registered" acknowledgement.
     /// Throws std::runtime_error on failure.
     void connect_to_relay();
 
-    /// Blocking receive loop — returns when the connection is closed.
+    /// Blocking receive loop — returns when the connection is closed or
+    /// disconnect() is called.
     void handle_messages();
 
     /// Send a heartbeat message; called periodically by the heartbeat thread.
@@ -55,6 +57,9 @@ public:
     /// Start the node: connect, then run message-handling and heartbeat
     /// concurrently (blocks until disconnected).
     void start();
+
+    /// Gracefully close the WebSocket connection and stop the heartbeat loop.
+    void disconnect();
 
     /// Accessors
     bool        connected()    const { return connected_; }

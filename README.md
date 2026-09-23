@@ -67,9 +67,9 @@ docker run --rm --name node2 --link cluster_relay:relay cluster-suite:latest \
 ## Command-Line Options
 
 ### Common Options
-- `--mode`: Operation mode (`relay` or `node`) - **Required**
-- `--cluster`: Cluster name - **Required**
-- `--relay-port`: Relay server port (default: 4040)
+- `--mode`: Operation mode (`relay`, `node`, or `research`) - **Required**
+- `--cluster`: Cluster name - **Required for `relay` and `node` modes**
+- `--relay-port`: Relay server port (default: 4040, used by `relay` and `node` modes)
 - `--debug`: Enable debug logging
 
 ### Relay Mode Options
@@ -80,6 +80,10 @@ No additional options required. The relay will listen on the specified port.
 - `--relay-host`: Relay server hostname - **Required**
 - `--lan-port`: Node LAN port - **Required**
 - `--enable-ble`: Enable BLE support (optional flag)
+
+### Research Mode Options
+- `--research-input`: Path to JSON file with market/public record data (`records` array or raw array)
+- `--vm-layers`: Number of analysis layers used for multiplex patterning (default: `3`)
 
 ## Architecture
 ```

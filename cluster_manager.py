@@ -12,7 +12,7 @@ import logging
 import sys
 from datetime import datetime
 from typing import Set, Dict, Optional
-from market_research_engine import MarketResearchEngine
+from market_research_engine import MarketResearchEngine, MarketResearchInputError
 
 try:
     import websockets
@@ -319,7 +319,9 @@ def main():
             except FileNotFoundError as exc:
                 parser.error(f"research input file not found: {exc.filename}")
             except json.JSONDecodeError as exc:
-                parser.error(f"invalid research JSON input: {exc.msg}")
+                parser.error(
+                    f"invalid research JSON input at line {exc.lineno}, column {exc.colno}: {exc.msg}"
+                )
 
             if isinstance(payload, dict):
                 records = payload.get('records', [])
@@ -327,9 +329,14 @@ def main():
                 records = payload
             else:
                 parser.error("research input must be a list of records or {\"records\": [...]}")
+            if not isinstance(records, list):
+                parser.error("research input object must include records as an array")
 
-            engine = MarketResearchEngine(args.vm_layers)
-            result = engine.run(records)
+            try:
+                engine = MarketResearchEngine(args.vm_layers)
+                result = engine.run(records)
+            except MarketResearchInputError as exc:
+                parser.error(str(exc))
             print(json.dumps(result, indent=2))
             
     except KeyboardInterrupt:

@@ -6,6 +6,10 @@ from collections import defaultdict
 from typing import Dict, List, Any
 
 
+class MarketResearchInputError(ValueError):
+    """Raised when research input records contain invalid types/values."""
+
+
 class MarketResearchEngine:
     """Builds layered market patterns from public records and compliance signals."""
 
@@ -13,7 +17,7 @@ class MarketResearchEngine:
         self.vm_layers = max(1, vm_layers)
 
     def run(self, records: List[Dict[str, Any]]) -> Dict[str, Any]:
-        normalized = [self._normalize_record(record) for record in records]
+        normalized = [self._normalize_record(record, index) for index, record in enumerate(records)]
         multiplexed = self._multiplex_by_company(normalized)
         patterns = self._build_patterns(multiplexed)
         compliance = self._compliance_summary(normalized)
@@ -25,16 +29,36 @@ class MarketResearchEngine:
             "compliance": compliance,
         }
 
-    def _normalize_record(self, record: Dict[str, Any]) -> Dict[str, Any]:
+    def _normalize_record(self, record: Dict[str, Any], index: int) -> Dict[str, Any]:
+        if not isinstance(record, dict):
+            raise MarketResearchInputError(f"record {index} must be an object")
+
         normalized = dict(record)
         normalized["company"] = (record.get("company") or "unknown").strip().lower()
-        normalized["source_public"] = bool(record.get("source_public", False))
-        normalized["company_sales"] = float(record.get("company_sales", 0.0))
-        normalized["future_investment"] = float(record.get("future_investment", 0.0))
-        normalized["merger_opportunity"] = float(record.get("merger_opportunity", 0.0))
-        normalized["tax_regulation_score"] = float(record.get("tax_regulation_score", 0.0))
-        normalized["financing_regulation_score"] = float(record.get("financing_regulation_score", 0.0))
+        normalized["source_public"] = self._parse_bool(record.get("source_public", False), "source_public", index)
+        normalized["company_sales"] = self._parse_float(record.get("company_sales", 0.0), "company_sales", index)
+        normalized["future_investment"] = self._parse_float(record.get("future_investment", 0.0), "future_investment", index)
+        normalized["merger_opportunity"] = self._parse_float(record.get("merger_opportunity", 0.0), "merger_opportunity", index)
+        normalized["tax_regulation_score"] = self._parse_float(record.get("tax_regulation_score", 0.0), "tax_regulation_score", index)
+        normalized["financing_regulation_score"] = self._parse_float(record.get("financing_regulation_score", 0.0), "financing_regulation_score", index)
         return normalized
+
+    def _parse_bool(self, value: Any, field_name: str, index: int) -> bool:
+        if isinstance(value, bool):
+            return value
+        if isinstance(value, str):
+            lowered = value.strip().lower()
+            if lowered in {"true", "1", "yes"}:
+                return True
+            if lowered in {"false", "0", "no"}:
+                return False
+        raise MarketResearchInputError(f"record {index} has invalid {field_name}; expected boolean-like value")
+
+    def _parse_float(self, value: Any, field_name: str, index: int) -> float:
+        try:
+            return float(value)
+        except (TypeError, ValueError):
+            raise MarketResearchInputError(f"record {index} has invalid {field_name}; expected numeric value")
 
     def _multiplex_by_company(self, records: List[Dict[str, Any]]) -> Dict[str, Dict[str, Any]]:
         grouped: Dict[str, List[Dict[str, Any]]] = defaultdict(list)

@@ -1,6 +1,6 @@
 import unittest
 
-from market_research_engine import MarketResearchEngine
+from market_research_engine import MarketResearchEngine, MarketResearchInputError
 
 
 class MarketResearchEngineTests(unittest.TestCase):
@@ -69,6 +69,29 @@ class MarketResearchEngineTests(unittest.TestCase):
             multi_layer["patterns"][0]["layered_score"],
             single_layer["patterns"][0]["layered_score"],
         )
+
+    def test_source_public_string_false_is_treated_as_false(self):
+        engine = MarketResearchEngine()
+        result = engine.run([
+            {
+                "company": "StringBool",
+                "source_public": "false",
+                "company_sales": 100,
+            }
+        ])
+        self.assertEqual(result["patterns"], [])
+        self.assertEqual(result["compliance"]["non_public_records_excluded"], 1)
+
+    def test_invalid_numeric_value_raises_input_error(self):
+        engine = MarketResearchEngine()
+        with self.assertRaises(MarketResearchInputError):
+            engine.run([
+                {
+                    "company": "Broken",
+                    "source_public": True,
+                    "company_sales": "not-a-number",
+                }
+            ])
 
 
 if __name__ == "__main__":

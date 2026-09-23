@@ -81,14 +81,22 @@ class MarketResearchEngine:
 
         multiplexed: Dict[str, Dict[str, Any]] = {}
         for company, company_records in grouped.items():
-            public_records = [record for record in company_records if record["source_public"]]
-            sales = sum(record["company_sales"] for record in public_records)
-            investment = sum(record["future_investment"] for record in public_records)
-            merger = sum(record["merger_opportunity"] for record in public_records)
-            tax = sum(record["tax_regulation_score"] for record in public_records)
-            financing = sum(record["financing_regulation_score"] for record in public_records)
+            sales = 0.0
+            investment = 0.0
+            merger = 0.0
+            tax = 0.0
+            financing = 0.0
+            record_count = 0
+            for record in company_records:
+                if not record["source_public"]:
+                    continue
+                record_count += 1
+                sales += record["company_sales"]
+                investment += record["future_investment"]
+                merger += record["merger_opportunity"]
+                tax += record["tax_regulation_score"]
+                financing += record["financing_regulation_score"]
 
-            record_count = len(public_records)
             if record_count:
                 tax /= record_count
                 financing /= record_count

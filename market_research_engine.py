@@ -74,9 +74,9 @@ class MarketResearchEngine:
             growth = signals["sales_signal"] + signals["investment_signal"]
             strategic = growth + signals["merger_signal"]
             layered_score = strategic
-
-            for _ in range(self.vm_layers - 1):
-                layered_score = (layered_score + strategic) / 2
+            for layer_index in range(1, self.vm_layers):
+                reinforcement = strategic * (1 + (0.05 * layer_index))
+                layered_score = (layered_score * 0.75) + (reinforcement * 0.25)
 
             pattern_type = "watch"
             if layered_score >= 150:

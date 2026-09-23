@@ -245,7 +245,7 @@ def main():
     
     parser.add_argument('--mode', required=True, choices=['relay', 'node', 'research'],
                         help='Operation mode: relay, node, or research')
-    parser.add_argument('--cluster', required=True,
+    parser.add_argument('--cluster',
                         help='Cluster name')
     
     # Relay-specific arguments
@@ -280,6 +280,8 @@ def main():
         if args.mode == 'relay':
             if websockets is None:
                 parser.error("websockets library not installed. Run: pip install websockets")
+            if not args.cluster:
+                parser.error("--cluster is required in relay mode")
             # Start relay server
             relay = ClusterRelay(args.relay_port, args.cluster)
             asyncio.run(relay.start())
@@ -288,6 +290,8 @@ def main():
             if websockets is None:
                 parser.error("websockets library not installed. Run: pip install websockets")
             # Validate node-specific arguments
+            if not args.cluster:
+                parser.error("--cluster is required in node mode")
             if not args.node:
                 parser.error("--node is required in node mode")
             if not args.relay_host:
@@ -306,11 +310,16 @@ def main():
             )
             asyncio.run(node.start())
         elif args.mode == 'research':
-            if args.research_input:
-                with open(args.research_input, 'r', encoding='utf-8') as f:
-                    payload = json.load(f)
-            else:
-                payload = json.load(sys.stdin)
+            try:
+                if args.research_input:
+                    with open(args.research_input, 'r', encoding='utf-8') as f:
+                        payload = json.load(f)
+                else:
+                    payload = json.load(sys.stdin)
+            except FileNotFoundError as exc:
+                parser.error(f"research input file not found: {exc.filename}")
+            except json.JSONDecodeError as exc:
+                parser.error(f"invalid research JSON input: {exc.msg}")
 
             if isinstance(payload, dict):
                 records = payload.get('records', [])

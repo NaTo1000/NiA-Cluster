@@ -41,6 +41,35 @@ class MarketResearchEngineTests(unittest.TestCase):
         self.assertEqual(result["compliance"]["non_public_records_excluded"], 1)
         self.assertEqual(result["compliance"]["public_records"], 0)
 
+    def test_vm_layers_change_layered_score(self):
+        single_layer = MarketResearchEngine(vm_layers=1).run([
+            {
+                "company": "Layered",
+                "source_public": True,
+                "company_sales": 50,
+                "future_investment": 25,
+                "merger_opportunity": 25,
+                "tax_regulation_score": 0.7,
+                "financing_regulation_score": 0.7,
+            }
+        ])
+        multi_layer = MarketResearchEngine(vm_layers=4).run([
+            {
+                "company": "Layered",
+                "source_public": True,
+                "company_sales": 50,
+                "future_investment": 25,
+                "merger_opportunity": 25,
+                "tax_regulation_score": 0.7,
+                "financing_regulation_score": 0.7,
+            }
+        ])
+
+        self.assertGreater(
+            multi_layer["patterns"][0]["layered_score"],
+            single_layer["patterns"][0]["layered_score"],
+        )
+
 
 if __name__ == "__main__":
     unittest.main()

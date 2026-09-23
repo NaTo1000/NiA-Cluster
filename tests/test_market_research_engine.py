@@ -82,6 +82,32 @@ class MarketResearchEngineTests(unittest.TestCase):
         self.assertEqual(result["patterns"], [])
         self.assertEqual(result["compliance"]["non_public_records_excluded"], 1)
 
+    def test_source_public_string_true_is_treated_as_true(self):
+        engine = MarketResearchEngine()
+        result = engine.run([
+            {
+                "company": "StringTrue",
+                "source_public": "yes",
+                "company_sales": 60,
+                "future_investment": 20,
+                "merger_opportunity": 10,
+                "tax_regulation_score": 0.9,
+                "financing_regulation_score": 0.9,
+            }
+        ])
+        self.assertEqual(len(result["patterns"]), 1)
+
+    def test_invalid_source_public_string_raises_input_error(self):
+        engine = MarketResearchEngine()
+        with self.assertRaises(MarketResearchInputError):
+            engine.run([
+                {
+                    "company": "BadBool",
+                    "source_public": "sometimes",
+                    "company_sales": 10,
+                }
+            ])
+
     def test_invalid_numeric_value_raises_input_error(self):
         engine = MarketResearchEngine()
         with self.assertRaises(MarketResearchInputError):

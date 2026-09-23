@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from collections import defaultdict
+import math
 from typing import Dict, List, Any
 
 
@@ -34,13 +35,11 @@ class MarketResearchEngine:
             raise MarketResearchInputError(f"record {index} must be an object")
 
         company = record.get("company")
-        if company is None:
-            company = "unknown"
-        if not isinstance(company, str):
+        if not isinstance(company, str) or not company.strip():
             raise MarketResearchInputError(f"record {index} has invalid company; expected string value")
 
         normalized = dict(record)
-        normalized["company"] = (company or "unknown").strip().lower()
+        normalized["company"] = company.strip().lower()
         normalized["source_public"] = self._parse_bool(record.get("source_public", False), "source_public", index)
         normalized["company_sales"] = self._parse_float(record.get("company_sales", 0.0), "company_sales", index)
         normalized["future_investment"] = self._parse_float(record.get("future_investment", 0.0), "future_investment", index)
@@ -64,9 +63,12 @@ class MarketResearchEngine:
         if isinstance(value, bool):
             raise MarketResearchInputError(f"record {index} has invalid {field_name}; expected numeric value")
         try:
-            return float(value)
+            parsed = float(value)
         except (TypeError, ValueError):
             raise MarketResearchInputError(f"record {index} has invalid {field_name}; expected numeric value")
+        if not math.isfinite(parsed):
+            raise MarketResearchInputError(f"record {index} has invalid {field_name}; expected finite numeric value")
+        return parsed
 
     def _multiplex_by_company(self, records: List[Dict[str, Any]]) -> Dict[str, Dict[str, Any]]:
         grouped: Dict[str, List[Dict[str, Any]]] = defaultdict(list)

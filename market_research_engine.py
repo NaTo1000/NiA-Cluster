@@ -15,6 +15,8 @@ class MarketResearchEngine:
     """Builds layered market patterns from public records and compliance signals."""
 
     def __init__(self, vm_layers: int = 3):
+        if not isinstance(vm_layers, int) or isinstance(vm_layers, bool):
+            raise MarketResearchInputError("vm_layers must be an integer")
         if vm_layers <= 0:
             raise MarketResearchInputError("vm_layers must be a positive integer")
         self.vm_layers = vm_layers

@@ -149,6 +149,10 @@ class MarketResearchEngineTests(unittest.TestCase):
         with self.assertRaises(MarketResearchInputError):
             MarketResearchEngine(vm_layers=0)
 
+    def test_non_integer_vm_layers_raises_input_error(self):
+        with self.assertRaises(MarketResearchInputError):
+            MarketResearchEngine(vm_layers=1.5)
+
 
 if __name__ == "__main__":
     unittest.main()

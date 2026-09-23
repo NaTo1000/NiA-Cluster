@@ -69,7 +69,7 @@ docker run --rm --name node2 --link cluster_relay:relay cluster-suite:latest \
 ### Common Options
 - `--mode`: Operation mode (`relay`, `node`, or `research`) - **Required**
 - `--cluster`: Cluster name - **Required for `relay` and `node` modes**
-- `--relay-port`: Relay server port (default: 4040)
+- `--relay-port`: Relay server port (default: 4040, used by `relay` and `node` modes)
 - `--debug`: Enable debug logging
 
 ### Relay Mode Options

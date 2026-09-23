@@ -326,7 +326,9 @@ def main():
                 )
 
             if isinstance(payload, dict):
-                records = payload.get('records', [])
+                if 'records' not in payload:
+                    parser.error("research input object must include a records field")
+                records = payload['records']
             elif isinstance(payload, list):
                 records = payload
             else:

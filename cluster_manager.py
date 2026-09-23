@@ -1,4 +1,6 @@
 #!/usr/bin/env python3
+from __future__ import annotations
+
 """
 NiA-Cluster Manager
 Internal WiFi/BLE ESP clustering manager with port control and security
@@ -10,12 +12,12 @@ import logging
 import sys
 from datetime import datetime
 from typing import Set, Dict, Optional
+from market_research_engine import MarketResearchEngine
 
 try:
     import websockets
 except ImportError:
-    print("Error: websockets library not installed. Run: pip install websockets")
-    sys.exit(1)
+    websockets = None
 
 logging.basicConfig(
     level=logging.INFO,
@@ -241,8 +243,8 @@ def main():
         description='NiA-Cluster Manager - WiFi/BLE ESP clustering system'
     )
     
-    parser.add_argument('--mode', required=True, choices=['relay', 'node'],
-                        help='Operation mode: relay or node')
+    parser.add_argument('--mode', required=True, choices=['relay', 'node', 'research'],
+                        help='Operation mode: relay, node, or research')
     parser.add_argument('--cluster', required=True,
                         help='Cluster name')
     
@@ -259,6 +261,12 @@ def main():
                         help='Node LAN port (required in node mode)')
     parser.add_argument('--enable-ble', action='store_true',
                         help='Enable BLE support (node mode)')
+
+    # Research mode arguments
+    parser.add_argument('--research-input',
+                        help='Path to JSON market/public-record input file (research mode)')
+    parser.add_argument('--vm-layers', type=int, default=3,
+                        help='Number of VM analysis layers for patterning (research mode)')
     
     parser.add_argument('--debug', action='store_true',
                         help='Enable debug logging')
@@ -270,11 +278,15 @@ def main():
     
     try:
         if args.mode == 'relay':
+            if websockets is None:
+                parser.error("websockets library not installed. Run: pip install websockets")
             # Start relay server
             relay = ClusterRelay(args.relay_port, args.cluster)
             asyncio.run(relay.start())
             
         elif args.mode == 'node':
+            if websockets is None:
+                parser.error("websockets library not installed. Run: pip install websockets")
             # Validate node-specific arguments
             if not args.node:
                 parser.error("--node is required in node mode")
@@ -293,6 +305,23 @@ def main():
                 args.enable_ble
             )
             asyncio.run(node.start())
+        elif args.mode == 'research':
+            if args.research_input:
+                with open(args.research_input, 'r', encoding='utf-8') as f:
+                    payload = json.load(f)
+            else:
+                payload = json.load(sys.stdin)
+
+            if isinstance(payload, dict):
+                records = payload.get('records', [])
+            elif isinstance(payload, list):
+                records = payload
+            else:
+                parser.error("research input must be a list of records or {\"records\": [...]}")
+
+            engine = MarketResearchEngine(args.vm_layers)
+            result = engine.run(records)
+            print(json.dumps(result, indent=2))
             
     except KeyboardInterrupt:
         logger.info("Shutting down...")

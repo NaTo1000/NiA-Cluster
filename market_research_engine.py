@@ -33,8 +33,14 @@ class MarketResearchEngine:
         if not isinstance(record, dict):
             raise MarketResearchInputError(f"record {index} must be an object")
 
+        company = record.get("company")
+        if company is None:
+            company = "unknown"
+        if not isinstance(company, str):
+            raise MarketResearchInputError(f"record {index} has invalid company; expected string value")
+
         normalized = dict(record)
-        normalized["company"] = (record.get("company") or "unknown").strip().lower()
+        normalized["company"] = (company or "unknown").strip().lower()
         normalized["source_public"] = self._parse_bool(record.get("source_public", False), "source_public", index)
         normalized["company_sales"] = self._parse_float(record.get("company_sales", 0.0), "company_sales", index)
         normalized["future_investment"] = self._parse_float(record.get("future_investment", 0.0), "future_investment", index)
@@ -55,6 +61,8 @@ class MarketResearchEngine:
         raise MarketResearchInputError(f"record {index} has invalid {field_name}; expected boolean-like value")
 
     def _parse_float(self, value: Any, field_name: str, index: int) -> float:
+        if isinstance(value, bool):
+            raise MarketResearchInputError(f"record {index} has invalid {field_name}; expected numeric value")
         try:
             return float(value)
         except (TypeError, ValueError):

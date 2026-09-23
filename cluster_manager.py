@@ -318,6 +318,8 @@ def main():
                     payload = json.load(sys.stdin)
             except FileNotFoundError as exc:
                 parser.error(f"research input file not found: {exc.filename}")
+            except OSError as exc:
+                parser.error(f"unable to read research input file: {exc}")
             except json.JSONDecodeError as exc:
                 parser.error(
                     f"invalid research JSON input at line {exc.lineno}, column {exc.colno}: {exc.msg}"

@@ -93,6 +93,17 @@ class MarketResearchEngineTests(unittest.TestCase):
                 }
             ])
 
+    def test_boolean_numeric_value_raises_input_error(self):
+        engine = MarketResearchEngine()
+        with self.assertRaises(MarketResearchInputError):
+            engine.run([
+                {
+                    "company": "BoolNumeric",
+                    "source_public": True,
+                    "company_sales": True,
+                }
+            ])
+
 
 if __name__ == "__main__":
     unittest.main()

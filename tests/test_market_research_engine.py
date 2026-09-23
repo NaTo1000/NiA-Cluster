@@ -97,6 +97,21 @@ class MarketResearchEngineTests(unittest.TestCase):
         ])
         self.assertEqual(len(result["patterns"]), 1)
 
+    def test_source_public_boolean_true_is_supported(self):
+        engine = MarketResearchEngine()
+        result = engine.run([
+            {
+                "company": "BoolTrue",
+                "source_public": True,
+                "company_sales": 20,
+                "future_investment": 20,
+                "merger_opportunity": 0,
+                "tax_regulation_score": 0.6,
+                "financing_regulation_score": 0.6,
+            }
+        ])
+        self.assertEqual(result["compliance"]["public_records"], 1)
+
     def test_invalid_source_public_string_raises_input_error(self):
         engine = MarketResearchEngine()
         with self.assertRaises(MarketResearchInputError):
@@ -129,6 +144,10 @@ class MarketResearchEngineTests(unittest.TestCase):
                     "company_sales": True,
                 }
             ])
+
+    def test_non_positive_vm_layers_raises_input_error(self):
+        with self.assertRaises(MarketResearchInputError):
+            MarketResearchEngine(vm_layers=0)
 
 
 if __name__ == "__main__":

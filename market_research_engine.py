@@ -15,7 +15,9 @@ class MarketResearchEngine:
     """Builds layered market patterns from public records and compliance signals."""
 
     def __init__(self, vm_layers: int = 3):
-        self.vm_layers = max(1, vm_layers)
+        if vm_layers <= 0:
+            raise MarketResearchInputError("vm_layers must be a positive integer")
+        self.vm_layers = vm_layers
 
     def run(self, records: List[Dict[str, Any]]) -> Dict[str, Any]:
         normalized = [self._normalize_record(record, index) for index, record in enumerate(records)]

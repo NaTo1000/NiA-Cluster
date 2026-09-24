@@ -137,5 +137,14 @@ Verify the exact commands from the problem statement work:
 - `submit-cloud-build.sh` - Submit builds to Google Cloud Build for containerized VM builds
 - `build-cloud-local.sh` - Test Cloud Build configurations locally before submission
 
+## C++ Port
+
+A full C++ port of NiA-Cluster is available in the [`cpp/`](cpp/) directory.
+It mirrors the Python relay/node classes and CLI interface, using Boost.Beast
+for WebSockets, nlohmann/json for JSON, and spdlog for logging.
+
+See [cpp/README.md](cpp/README.md) for build instructions (Visual Studio 2022,
+Linux, macOS).
+
 ## License
 MIT License
